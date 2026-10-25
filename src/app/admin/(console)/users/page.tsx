@@ -1,0 +1,104 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { Card, EmptyState, Input, PageHeader, StatusBadge, Table } from "@/components/ui";
+import { requireAdmin } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { formatDate, formatMoney } from "@/lib/money";
+
+export const metadata: Metadata = { title: "Clients" };
+
+export default async function UsersPage({ searchParams }: PageProps<"/admin/users">) {
+  await requireAdmin();
+  const { q } = await searchParams;
+  const query = typeof q === "string" ? q.trim() : "";
+
+  const users = await db.user.findMany({
+    where: {
+      role: "USER",
+      ...(query && {
+        OR: [
+          { email: { contains: query } },
+          { firstName: { contains: query } },
+          { lastName: { contains: query } },
+        ],
+      }),
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    include: { _count: { select: { fundRequests: { where: { status: "PENDING" } } } } },
+  });
+
+  return (
+    <>
+      <PageHeader
+        title="Clients"
+        description="Every registered account, its balance and status."
+        action={
+          <form className="w-full sm:w-72">
+            <Input name="q" placeholder="Search name or email…" defaultValue={query} />
+          </form>
+        }
+      />
+      <Card>
+        {users.length === 0 ? (
+          <EmptyState title="No clients found." />
+        ) : (
+          <>
+          <ul className="divide-y divide-line md:hidden">
+            {users.map((u) => (
+              <li key={u.id}>
+                <Link href={`/admin/users/${u.id}`} className="flex items-center justify-between gap-3 px-4 py-3.5 text-sm">
+                  <span className="min-w-0">
+                    <span className="block font-medium">{u.firstName} {u.lastName}</span>
+                    <span className="block truncate text-xs text-muted">{u.email}</span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block font-mono tabular-nums">{formatMoney(u.balance, u.currency)}</span>
+                    <span className="mt-0.5 flex items-center justify-end gap-2">
+                      {u._count.fundRequests > 0 && (
+                        <span className="text-xs text-warning">{u._count.fundRequests} pending</span>
+                      )}
+                      <StatusBadge status={u.status} />
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden md:block">
+          <Table>
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Country</th>
+                <th>Joined</th>
+                <th className="text-right">Balance</th>
+                <th className="text-right">Pending</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id}>
+                  <td>
+                    <Link href={`/admin/users/${u.id}`} className="font-medium hover:text-brand">
+                      {u.firstName} {u.lastName}
+                    </Link>
+                    <p className="text-xs text-muted">{u.email}</p>
+                  </td>
+                  <td className="text-muted">{u.country ?? "—"}</td>
+                  <td className="whitespace-nowrap text-muted">{formatDate(u.createdAt)}</td>
+                  <td className="text-right font-mono tabular-nums">{formatMoney(u.balance, u.currency)}</td>
+                  <td className="text-right">{u._count.fundRequests || "—"}</td>
+                  <td><StatusBadge status={u.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          </div>
+          </>
+        )}
+      </Card>
+    </>
+  );
+}

@@ -1,0 +1,185 @@
+@import "tailwindcss";
+
+:root {
+  --background: #05070c;
+  --surface: #0a0e17;
+  --surface-2: #111726;
+  --border: #1b2335;
+  --foreground: #e8edf6;
+  --muted: #8591a8;
+  --brand: #3a7bfd;
+  --brand-strong: #2563eb;
+  --up: #16c784;
+  --down: #f6465d;
+  --danger: #f6465d;
+  --warning: #f0b90b;
+}
+
+/* Admin console: light, neutral theme so it is never mistaken for the client app. */
+.theme-admin {
+  --background: #f4f5f8;
+  --surface: #ffffff;
+  --surface-2: #f0f2f6;
+  --border: #e1e5ec;
+  --foreground: #0f1729;
+  --muted: #5d6b82;
+  --brand: #4338ca;
+  --brand-strong: #3730a3;
+  --up: #059669;
+  --down: #dc2626;
+  --danger: #dc2626;
+  --warning: #b45309;
+  color-scheme: light;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--brand) 35%, transparent);
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, black 30%, transparent 75%);
+}
+
+/* ---------- Motion ---------- */
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-enter {
+  animation: fade-up 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+/* Scroll reveal: hidden only when scripting is on, so content never disappears without JS. */
+@media (scripting: enabled) {
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition:
+      opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1),
+      transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+.animate-fade-in { animation: fade-in 0.25s ease-out; }
+
+@keyframes slide-in {
+  from { transform: translateX(-100%); }
+}
+.animate-slide-in { animation: slide-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1); }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.animate-float { animation: float 7s ease-in-out infinite; }
+
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(60px, -40px) scale(1.1); }
+  66% { transform: translate(-40px, 30px) scale(0.95); }
+}
+.animate-drift { animation: drift 18s ease-in-out infinite; }
+.animate-drift-slow { animation: drift 26s ease-in-out infinite reverse; }
+
+@keyframes shimmer {
+  to { background-position: 200% center; }
+}
+.text-shimmer {
+  background-size: 200% auto;
+  animation: shimmer 6s linear infinite;
+}
+
+@keyframes grid-pan {
+  to { background-position: 56px 56px; }
+}
+.grid-bg.animate-pan { animation: grid-pan 8s linear infinite; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.live-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+
+/* Light sweep across primary buttons on hover */
+.btn-shine { position: relative; overflow: hidden; }
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.28) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.7s ease;
+}
+.btn-shine:hover::after { transform: translateX(120%); }
+
+/* Rotating gradient border for highlighted cards */
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes spin-angle {
+  to { --angle: 360deg; }
+}
+.glow-border {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    conic-gradient(from var(--angle), var(--brand), transparent 30%, var(--up), transparent 70%, var(--brand)) border-box;
+  animation: spin-angle 6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-enter, .animate-fade-in, .animate-slide-in, .animate-float, .animate-drift, .animate-drift-slow, .text-shimmer,
+  .grid-bg.animate-pan, .live-dot, .glow-border { animation: none; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .btn-shine::after { display: none; }
+}
+
+/* TradingView iframes use the default color scheme. Matching it on the iframe
+   element stops the browser painting an opaque white backdrop on our dark page. */
+.tradingview-widget-container iframe {
+  color-scheme: normal;
+}
