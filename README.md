@@ -25,6 +25,9 @@ Open http://localhost:3000. Clients use `/login`; the super admin signs in at `/
 | `/` | public | Landing page: hero terminal, sticky live-price ticker, the four markets |
 | `/markets` | public | Descriptions of the four markets (stocks, indices, commodities, metals) |
 | `/signup`, `/login` | public | Client registration and login |
+| `/onboarding` | new client | Upload passport, Emirates ID and proof of address, then accept the terms |
+| `/terms` | public | Terms & Conditions |
+| `/about`, `/contact` | public | About us; contact form that saves to Admin → Messages |
 | `/dashboard` | client | Balances, pending requests, recent activity |
 | `/dashboard/markets` | client | Live charts and quotes |
 | `/dashboard/deposit` | client | Submit / cancel deposit requests |
@@ -39,9 +42,11 @@ Open http://localhost:3000. Clients use `/login`; the super admin signs in at `/
 
 ## Brand
 
-- Logo: `public/brand/bivora-logo.svg` (1200×1200, on the site background colour), used everywhere
+- Logo: `public/brand/bivora-logo.svg` (square, transparent background), used everywhere
   through `src/components/logo.tsx`. Earlier logos and the original black version are kept in
   `old-logos/`, which the website does not serve.
+- Site colours come from the logo: teal-green, cyan and gold on near-black (`src/app/globals.css`).
+  Red is the one exception, kept for price falls and errors.
 - Favicon `src/app/icon.svg`, Apple touch icon `src/app/apple-icon.tsx`, share image
   `src/app/opengraph-image.tsx` (also used for Twitter/X).
 - Set `NEXT_PUBLIC_SITE_URL` to the real domain in production so share previews use absolute URLs.
@@ -79,6 +84,21 @@ branch, country, currency) and pick one when withdrawing. The server builds the 
 the stored account, so a modified form cannot redirect a payout. Admins see a client's saved
 accounts on the client page.
 
+## Identity verification
+
+Onboarding is mandatory for every client account and can't be skipped: a non-closable modal over a blurred
+background, repeated after a rejection. Super admins review documents from the client page.
+
+- Four steps, one per screen: passport, Emirates ID, proof of address, terms.
+- Passport: front, optional back. Emirates ID: front and back. Proof of address: one page. A PDF under
+  Front counts as both sides. Each can also be captured with the camera.
+- JPG, PNG, WebP or PDF up to 10 MB, checked from the file's contents.
+- Files are stored outside `public/` (`KYC_STORAGE_DIR`, default `storage/kyc`, ignored by git) and served
+  only through `/api/kyc/[id]` to the owner or a super admin.
+
+Identity documents need durable, encrypted storage in production. A server's local disk is not enough, and
+on serverless hosts it isn't kept at all; swap `src/lib/kyc-storage.ts` for private object storage.
+
 ## How funds work
 
 - A client submits a **deposit** or **withdrawal** request; it starts as `PENDING`.
@@ -110,5 +130,8 @@ approval transaction, so a failed ARK call rolls the approval back.
 - Switch the Prisma datasource to PostgreSQL and set `DATABASE_URL`.
 - Use a strong, unique `SESSION_SECRET` and change the super admin password.
 - Replace the placeholder payment details in `PAYMENT_INSTRUCTIONS` (`src/lib/constants.ts`).
+- Connect an email service if contact messages should also arrive at support@bivoramarkets.com.
+- Have the draft terms in `src/lib/terms.ts` reviewed by a lawyer.
+- Move identity documents to private, encrypted storage (see above).
 - Review the marketing copy, account tiers, leverage figures and risk warning with your compliance team.
 - Consider moving `/admin` to a less guessable path or restricting it by IP.

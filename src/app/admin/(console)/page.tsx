@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { FundRequestTable } from "@/components/fund-request-table";
 import { ButtonLink, Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
@@ -10,7 +11,7 @@ export const metadata: Metadata = { title: "Admin" };
 
 export default async function AdminPage() {
   await requireAdmin();
-  const [pending, clients, balances, approved, queue] = await Promise.all([
+  const [pending, clients, balances, approved, queue, verifications] = await Promise.all([
     db.fundRequest.groupBy({
       by: ["type"],
       where: { status: "PENDING" },
@@ -26,6 +27,7 @@ export default async function AdminPage() {
       take: 10,
       include: { user: { select: { email: true, firstName: true, lastName: true } } },
     }),
+    db.user.findMany({ where: { role: "USER", kycStatus: "PENDING" }, orderBy: { kycSubmittedAt: "asc" }, take: 10 }),
   ]);
 
   const pendingOf = (type: string) => pending.find((p) => p.type === type);
@@ -54,6 +56,25 @@ export default async function AdminPage() {
           hint={`${formatMoney(approvedOf("WITHDRAWAL"))} withdrawn`}
         />
       </div>
+
+      {verifications.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader title="Identity checks to review" description="Open a client to view their documents." />
+          <ul className="divide-y divide-line text-sm">
+            {verifications.map((u) => (
+              <li key={u.id}>
+                <Link href={`/admin/users/${u.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-2 sm:px-5">
+                  <span className="min-w-0">
+                    <span className="block font-medium">{u.firstName} {u.lastName}</span>
+                    <span className="block truncate text-xs text-muted">{u.email}</span>
+                  </span>
+                  <span className="shrink-0 font-medium text-brand">Review →</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <Card className="mt-6">
         <CardHeader

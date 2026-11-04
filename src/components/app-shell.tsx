@@ -1,10 +1,12 @@
+import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
-import { logout } from "@/app/(auth)/actions";
 import { getCurrentUser } from "@/lib/auth";
+import { KycBanner } from "./kyc-banner";
 import { Logo } from "./logo";
 import { TickerTape } from "./markets/tradingview";
 import { MobileNav } from "./mobile-nav";
 import { NavLinkList, NavLinks, type NavItem } from "./nav-links";
+import { Toaster } from "./toast";
 import { Skeleton } from "./ui";
 
 function SidebarContent({ nav }: { nav: NavItem[] }) {
@@ -45,11 +47,17 @@ export function AppShell({ nav, children }: { nav: NavItem[]; children: ReactNod
             </Suspense>
           </div>
         </header>
-        <main className="flex-1 px-4 py-6 sm:px-8 sm:py-8">{children}</main>
+        <main className="flex-1 px-4 py-6 sm:px-8 sm:py-8">
+          <Suspense>
+            <KycBanner />
+          </Suspense>
+          {children}
+        </main>
         {/* Live prices pinned to the bottom of the viewport, like a terminal status bar. */}
         <div className="sticky bottom-0 z-30 border-t border-line bg-background/85 backdrop-blur-xl">
           <TickerTape />
         </div>
+        <Toaster />
       </div>
     </div>
   );
@@ -59,22 +67,17 @@ async function UserMenu() {
   const user = await getCurrentUser();
   if (!user) return null;
   return (
-    <div className="flex items-center gap-3 sm:gap-4">
-      <div className="hidden text-right text-sm leading-tight sm:block">
-        <p className="font-medium">
+    <Link href="/dashboard/profile" aria-label="Your profile" className="group flex items-center gap-3">
+      <span className="hidden text-right text-sm leading-tight sm:block">
+        <span className="block font-medium group-hover:text-brand">
           {user.firstName} {user.lastName}
-        </p>
-        <p className="text-xs text-muted">{user.email}</p>
-      </div>
-      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand/15 text-sm font-semibold text-brand">
+        </span>
+        <span className="block text-xs text-muted">{user.email}</span>
+      </span>
+      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand/15 text-sm font-semibold text-brand transition-colors group-hover:bg-brand group-hover:text-on-brand">
         {user.firstName[0]}
         {user.lastName[0]}
       </span>
-      <form action={logout}>
-        <button className="rounded-lg border border-line px-3 py-1.5 text-sm text-muted hover:text-foreground">
-          Log out
-        </button>
-      </form>
-    </div>
+    </Link>
   );
 }

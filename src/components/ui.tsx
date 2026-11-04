@@ -6,14 +6,14 @@ export function cn(...classes: (string | false | null | undefined)[]) {
 }
 
 const buttonVariants = {
-  primary: "btn-shine bg-brand text-white shadow-sm shadow-brand/20 hover:bg-brand-strong hover:shadow-lg hover:shadow-brand/30",
+  primary: "btn-shine bg-brand text-on-brand shadow-sm shadow-brand/20 hover:bg-brand-strong hover:shadow-lg hover:shadow-brand/30",
   secondary: "border border-line bg-surface-2 text-foreground hover:bg-line",
   ghost: "text-muted hover:text-foreground hover:bg-surface-2",
   danger: "bg-danger/15 text-danger hover:bg-danger/25",
 };
 
 const buttonBase =
-  "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50";
 
 export function Button({
   variant = "primary",
@@ -52,7 +52,7 @@ export function CardHeader({
         <h2 className="font-medium">{title}</h2>
         {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
       </div>
-      {action}
+      {action && <div className="shrink-0 whitespace-nowrap">{action}</div>}
     </div>
   );
 }
@@ -178,7 +178,7 @@ export function StatusBadge({ status }: { status: string }) {
         statusStyles[status] ?? "bg-line text-muted",
       )}
     >
-      {status.toLowerCase()}
+      {status.toLowerCase().replace("_", " ")}
     </span>
   );
 }

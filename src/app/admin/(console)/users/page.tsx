@@ -58,7 +58,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                       {u._count.fundRequests > 0 && (
                         <span className="text-xs text-warning">{u._count.fundRequests} pending</span>
                       )}
-                      <StatusBadge status={u.status} />
+                      <StatusBadge status={u.kycStatus} />
                     </span>
                   </span>
                 </Link>
@@ -74,6 +74,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                 <th>Joined</th>
                 <th className="text-right">Balance</th>
                 <th className="text-right">Pending</th>
+                <th>Verification</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -90,6 +91,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                   <td className="whitespace-nowrap text-muted">{formatDate(u.createdAt)}</td>
                   <td className="text-right font-mono tabular-nums">{formatMoney(u.balance, u.currency)}</td>
                   <td className="text-right">{u._count.fundRequests || "—"}</td>
+                  <td><StatusBadge status={u.kycStatus} /></td>
                   <td><StatusBadge status={u.status} /></td>
                 </tr>
               ))}

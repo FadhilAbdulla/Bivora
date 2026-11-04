@@ -12,25 +12,33 @@ datasource db {
 // role:   USER | SUPER_ADMIN
 // status: ACTIVE | SUSPENDED
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  firstName    String
-  lastName     String
-  phone        String?
-  country      String?
-  role         String   @default("USER")
-  status       String   @default("ACTIVE")
-  balance      Decimal  @default(0)
-  currency     String   @default("USD")
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  phone           String?
+  country         String?
+  role            String    @default("USER")
+  status          String    @default("ACTIVE")
+  balance         Decimal   @default(0)
+  currency        String    @default("USD")
   // ARK trader account login, filled in once the ARK integration is live.
-  arkAccountId String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  arkAccountId    String?
+  // Onboarding. kycStatus: NOT_SUBMITTED | PENDING | APPROVED | REJECTED
+  termsAcceptedAt DateTime?
+  termsVersion    String?
+  kycStatus       String    @default("NOT_SUBMITTED")
+  kycNote         String?
+  kycSubmittedAt  DateTime?
+  kycReviewedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   fundRequests     FundRequest[] @relation("requester")
   reviewedRequests FundRequest[] @relation("reviewer")
   ledgerEntries    LedgerEntry[]
+  kycDocuments     KycDocument[]
   bankAccounts     BankAccount[]
 }
 
@@ -93,4 +101,32 @@ model BankAccount {
   createdAt     DateTime @default(now())
 
   @@index([userId])
+}
+
+// Identity documents. Files live outside the public folder (see src/lib/kyc-storage.ts).
+// type: PASSPORT | EMIRATES_ID | PROOF_OF_ADDRESS, slot: FRONT | BACK | MAIN
+model KycDocument {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String
+  slot       String
+  fileName   String
+  mimeType   String
+  size       Int
+  storageKey String
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, type, slot])
+}
+
+// Messages sent through the public contact form, read in the admin console.
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }

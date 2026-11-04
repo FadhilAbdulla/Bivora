@@ -1,34 +1,41 @@
 @import "tailwindcss";
 
 :root {
-  --background: #05070c;
-  --surface: #0a0e17;
-  --surface-2: #111726;
-  --border: #1b2335;
-  --foreground: #e8edf6;
-  --muted: #8591a8;
-  --brand: #3a7bfd;
-  --brand-strong: #2563eb;
-  --up: #16c784;
+  /* Palette taken from the Bivora logo: teal-green, cyan and gold on near-black. */
+  --background: #070908;
+  --surface: #0e1211;
+  --surface-2: #151b19;
+  --border: #232c29;
+  --foreground: #f1f5f2;
+  --muted: #93a09b;
+  --brand: #23ae80;
+  --brand-strong: #129879;
+  --on-brand: #060000;
+  --cyan: #3dc7de;
+  --gold: #d4b35f;
+  --up: #37be8c;
   --down: #f6465d;
   --danger: #f6465d;
-  --warning: #f0b90b;
+  --warning: #d4b35f;
 }
 
-/* Admin console: light, neutral theme so it is never mistaken for the client app. */
+/* Admin console: light theme so it is never mistaken for the client app, in the same logo colours. */
 .theme-admin {
-  --background: #f4f5f8;
+  --background: #f5f7f6;
   --surface: #ffffff;
-  --surface-2: #f0f2f6;
-  --border: #e1e5ec;
-  --foreground: #0f1729;
-  --muted: #5d6b82;
-  --brand: #4338ca;
-  --brand-strong: #3730a3;
-  --up: #059669;
+  --surface-2: #eef2f0;
+  --border: #dfe6e3;
+  --foreground: #0b1412;
+  --muted: #5a6a64;
+  --brand: #126f69;
+  --brand-strong: #0f5d58;
+  --on-brand: #ffffff;
+  --cyan: #135a72;
+  --gold: #9b732c;
+  --up: #127c65;
   --down: #dc2626;
   --danger: #dc2626;
-  --warning: #b45309;
+  --warning: #9b732c;
   color-scheme: light;
   background: var(--background);
   color: var(--foreground);
@@ -43,6 +50,9 @@
   --color-muted: var(--muted);
   --color-brand: var(--brand);
   --color-brand-strong: var(--brand-strong);
+  --color-on-brand: var(--on-brand);
+  --color-cyan: var(--cyan);
+  --color-gold: var(--gold);
   --color-up: var(--up);
   --color-down: var(--down);
   --color-danger: var(--danger);
@@ -167,7 +177,7 @@ body {
   border: 1px solid transparent;
   background:
     linear-gradient(var(--surface), var(--surface)) padding-box,
-    conic-gradient(from var(--angle), var(--brand), transparent 30%, var(--up), transparent 70%, var(--brand)) border-box;
+    conic-gradient(from var(--angle), var(--brand), transparent 30%, var(--gold), transparent 70%, var(--brand)) border-box;
   animation: spin-angle 6s linear infinite;
 }
 
@@ -182,4 +192,89 @@ body {
    element stops the browser painting an opaque white backdrop on our dark page. */
 .tradingview-widget-container iframe {
   color-scheme: normal;
+}
+
+/* Modal: a bottom sheet on phones, a centred dialog from tablet up. */
+dialog.modal {
+  margin: auto 0 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 92dvh;
+  padding: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem 1.25rem 0 0;
+}
+dialog.modal[open] {
+  display: flex;
+  flex-direction: column;
+  animation: sheet-up 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+}
+dialog.modal::backdrop {
+  background: rgb(0 0 0 / 0.6);
+  backdrop-filter: blur(6px);
+}
+dialog.modal[open]::backdrop { animation: backdrop-in 0.25s ease-out; }
+dialog.modal.closing[open] { animation: sheet-down 0.2s ease-in forwards; }
+dialog.modal.closing[open]::backdrop { animation: backdrop-out 0.2s ease-in forwards; }
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+}
+@keyframes sheet-down {
+  to { transform: translateY(100%); }
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+}
+@keyframes modal-out {
+  to { opacity: 0; transform: translateY(10px) scale(0.97); }
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+}
+@keyframes backdrop-out {
+  to { opacity: 0; }
+}
+@media (min-width: 640px) {
+  dialog.modal {
+    margin: auto;
+    max-width: 32rem;
+    max-height: 85dvh;
+    border-radius: 1rem;
+  }
+  dialog.modal[open] { animation-name: modal-in; animation-duration: 0.28s; }
+  dialog.modal.closing[open] { animation-name: modal-out; animation-duration: 0.2s; }
+}
+
+/* Onboarding */
+.onboarding-panel { animation: sheet-up 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+@media (min-width: 640px) {
+  .onboarding-panel { animation-name: modal-in; animation-duration: 0.45s; }
+}
+@keyframes step-in {
+  from { opacity: 0; transform: translateX(28px); }
+}
+.step-in { animation: step-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes pop {
+  0% { opacity: 0; transform: scale(0.94); }
+  60% { transform: scale(1.015); }
+}
+.animate-pop { animation: pop 0.32s ease-out; }
+@keyframes draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+.draw-ring { stroke-dasharray: 1; animation: draw 0.6s ease-out both; }
+.draw-check { stroke-dasharray: 1; animation: draw 0.35s 0.45s ease-out both; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+}
+.toast { animation: toast-in 0.25s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  dialog.modal[open], dialog.modal[open]::backdrop, dialog.modal.closing[open], dialog.modal.closing[open]::backdrop,
+  .toast, .onboarding-panel, .step-in, .animate-pop, .draw-ring, .draw-check { animation: none; }
 }

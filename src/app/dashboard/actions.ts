@@ -96,7 +96,7 @@ export async function cancelRequest(formData: FormData) {
 const profileSchema = z.object({
   firstName: z.string().trim().min(1, "Enter your first name.").max(60),
   lastName: z.string().trim().min(1, "Enter your last name.").max(60),
-  phone: z.string().trim().max(30).optional(),
+  phone: z.string().trim().regex(/^(\+[1-9]\d{6,14})?$/, "Enter a valid phone number.").optional(),
   country: z.string().trim().max(60).optional(),
 });
 

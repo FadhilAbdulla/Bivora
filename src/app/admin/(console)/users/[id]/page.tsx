@@ -6,8 +6,10 @@ import { Button, Card, CardHeader, EmptyState, PageHeader, StatCard, StatusBadge
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getAvailableBalance } from "@/lib/funds";
+import { kycTitle } from "@/lib/kyc";
 import { formatDate, formatMoney } from "@/lib/money";
 import { setUserStatus } from "../../actions";
+import { KycReview } from "../../kyc-review";
 import { ReviewActions } from "../../review-actions";
 import { AdjustBalanceForm } from "./adjust-balance-form";
 
@@ -19,11 +21,12 @@ export default async function UserDetailPage({ params }: PageProps<"/admin/users
   const user = await db.user.findUnique({ where: { id, role: "USER" } });
   if (!user) notFound();
 
-  const [{ available, pendingWithdrawals }, requests, ledger, bankAccounts] = await Promise.all([
+  const [{ available, pendingWithdrawals }, requests, ledger, bankAccounts, documents] = await Promise.all([
     getAvailableBalance(user.id),
     db.fundRequest.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 50 }),
     db.ledgerEntry.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 50 }),
     db.bankAccount.findMany({ where: { userId: user.id }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] }),
+    db.kycDocument.findMany({ where: { userId: user.id }, orderBy: [{ type: "asc" }, { slot: "desc" }] }),
   ]);
   const suspended = user.status === "SUSPENDED";
 
@@ -60,6 +63,36 @@ export default async function UserDetailPage({ params }: PageProps<"/admin/users
           <p className="text-xs text-muted">{user.country ?? "—"} · ARK: {user.arkAccountId ?? "pending"}</p>
         </Card>
       </div>
+
+      <Card className="mt-6">
+        <CardHeader
+          title="Identity verification"
+          description={user.termsAcceptedAt ? `Terms accepted ${formatDate(user.termsAcceptedAt)}` : "Terms not accepted yet"}
+          action={<StatusBadge status={user.kycStatus} />}
+        />
+        {user.kycNote && <p className="border-b border-line px-5 py-3 text-sm text-muted">Note: {user.kycNote}</p>}
+        {documents.length === 0 ? (
+          <EmptyState title="No documents uploaded yet." />
+        ) : (
+          <ul className="divide-y divide-line text-sm">
+            {documents.map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                <div className="min-w-0">
+                  <p className="font-medium">
+                    {kycTitle(d.type)}
+                    {d.slot === "BACK" ? " (back)" : d.slot === "FRONT" ? " (front)" : ""}
+                  </p>
+                  <p className="truncate text-xs text-muted">{d.fileName}</p>
+                </div>
+                <a href={`/api/kyc/${d.id}`} target="_blank" rel="noopener" className="shrink-0 px-2 py-2 font-medium text-brand hover:underline">
+                  View
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+        {user.kycStatus === "PENDING" && <KycReview userId={user.id} />}
+      </Card>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_22rem]">
         <Card className="min-w-0">

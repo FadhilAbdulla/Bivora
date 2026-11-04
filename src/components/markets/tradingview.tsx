@@ -114,7 +114,7 @@ export function SymbolOverview({ symbol, name, className }: { symbol: string; na
       script="embed-widget-symbol-overview"
       className={className}
       config={{
-        symbols: [[name, `${symbol}|1D`]],
+        symbols: [[name, `${symbol}|5D`]],
         chartOnly: false,
         width: "100%",
         height: "100%",
@@ -136,12 +136,12 @@ export function SymbolOverview({ symbol, name, className }: { symbol: string; na
         changeMode: "price-and-percent",
         chartType: "candlesticks",
         headerFontSize: "large",
-        dateRanges: ["1d|1", "5d|5", "1m|30", "3m|60", "12m|1D"],
-        upColor: "#16c784",
+        dateRanges: ["5d|5", "1m|30", "3m|60", "12m|1D"],
+        upColor: "#37be8c",
         downColor: "#f6465d",
-        borderUpColor: "#16c784",
+        borderUpColor: "#37be8c",
         borderDownColor: "#f6465d",
-        wickUpColor: "#16c784",
+        wickUpColor: "#37be8c",
         wickDownColor: "#f6465d",
         gridLineColor: "rgba(255,255,255,0.04)",
       }}
@@ -192,7 +192,7 @@ export function AdvancedChart({ symbol, className = "h-[560px]" }: { symbol: str
         theme: "dark",
         style: "1",
         locale: "en",
-        backgroundColor: "#0a0e17",
+        backgroundColor: "#0e1211",
         gridColor: "rgba(255,255,255,0.04)",
         allow_symbol_change: true,
         hide_side_toolbar: false,

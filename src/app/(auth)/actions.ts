@@ -12,14 +12,12 @@ const signupSchema = z.object({
   firstName: z.string().trim().min(1, "Enter your first name.").max(60),
   lastName: z.string().trim().min(1, "Enter your last name.").max(60),
   email: z.email("Enter a valid email address.").trim().toLowerCase(),
-  phone: z.string().trim().max(30).optional(),
-  country: z.string().trim().max(60).optional(),
+  phone: z.string().trim().regex(/^(\+[1-9]\d{6,14})?$/, "Enter a valid phone number.").optional(),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters.")
     .regex(/[A-Za-z]/, "Password must contain a letter.")
     .regex(/[0-9]/, "Password must contain a number."),
-  terms: z.literal("on", { error: "You must accept the terms and risk disclosure." }),
 });
 
 export async function signup(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -27,7 +25,7 @@ export async function signup(_prev: FormState, formData: FormData): Promise<Form
   const parsed = signupSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message, values };
 
-  const { password, terms: _terms, ...data } = parsed.data;
+  const { password, ...data } = parsed.data;
   const existing = await db.user.findUnique({ where: { email: data.email } });
   if (existing) return { error: "An account with this email already exists.", values };
 
@@ -36,13 +34,12 @@ export async function signup(_prev: FormState, formData: FormData): Promise<Form
     data: {
       ...data,
       phone: data.phone || null,
-      country: data.country || null,
       passwordHash: await bcrypt.hash(password, 12),
     },
   });
 
   await createSession("client", { userId: user.id });
-  redirect("/dashboard");
+  redirect("/onboarding");
 }
 
 const loginSchema = z.object({

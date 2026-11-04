@@ -18,12 +18,12 @@ export async function proxy(request: NextRequest) {
   }
 
   const client = await verifySession("client", request.cookies.get(SESSIONS.client.cookie)?.value);
-  if (pathname.startsWith("/dashboard") && !client) return redirectTo("/login", pathname);
+  if ((pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding")) && !client) return redirectTo("/login", pathname);
   if ((pathname === "/login" || pathname === "/signup") && client) return redirectTo("/dashboard");
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/login", "/signup"],
+  matcher: ["/dashboard/:path*", "/onboarding/:path*", "/admin/:path*", "/login", "/signup"],
 };

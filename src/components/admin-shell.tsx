@@ -9,15 +9,15 @@ import { NavLinkList, NavLinks, type NavItem } from "./nav-links";
 import { Skeleton } from "./ui";
 
 const navStyles =
-  "[&_a]:text-slate-300 [&_a:hover]:bg-white/5 [&_a:hover]:text-white [&_a[aria-current=page]]:bg-white/10 [&_a[aria-current=page]]:text-white";
+  "[&_a]:text-white/75 [&_a:hover]:bg-white/5 [&_a:hover]:text-white [&_a[aria-current=page]]:bg-white/10 [&_a[aria-current=page]]:text-white";
 
 function Brand() {
   return (
     <Link href="/admin" className="flex h-16 shrink-0 items-center gap-2.5 px-5">
-      <LogoMark className="size-8" />
+      <LogoMark className="size-10" />
       <span className="leading-tight">
         <span className="block text-sm font-semibold text-white">Bivora</span>
-        <span className="block text-[11px] uppercase tracking-wider text-slate-400">Admin console</span>
+        <span className="block text-[11px] uppercase tracking-wider text-white/55">Admin console</span>
       </span>
     </Link>
   );
@@ -27,7 +27,7 @@ function SidebarContent({ nav }: { nav: NavItem[] }) {
   return (
     <>
       <Brand />
-      <p className="px-5 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Operations</p>
+      <p className="px-5 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wider text-white/45">Operations</p>
       <nav className={`flex flex-1 flex-col gap-1 px-3 pb-3 ${navStyles}`}>
         <Suspense fallback={<NavLinkList items={nav} />}>
           <NavLinks items={nav} />
@@ -43,12 +43,12 @@ function SidebarContent({ nav }: { nav: NavItem[] }) {
 export function AdminShell({ nav, children }: { nav: NavItem[]; children: ReactNode }) {
   return (
     <div className="flex flex-1">
-      <aside className="hidden bg-[#0f1729] text-slate-300 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col">
+      <aside className="hidden bg-[#0b1210] text-white/75 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col">
         <SidebarContent nav={nav} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur sm:px-8">
-          <MobileNav panelClassName="bg-[#0f1729] text-slate-300">
+          <MobileNav panelClassName="bg-[#0b1210] text-white/75">
             <SidebarContent nav={nav} />
           </MobileNav>
           <Suspense fallback={<Skeleton className="h-6 w-32 sm:w-48" />}>
@@ -70,9 +70,9 @@ async function AdminIdentity() {
       <p className="text-sm font-medium text-white">
         {admin.firstName} {admin.lastName}
       </p>
-      <p className="truncate text-xs text-slate-400">{admin.email}</p>
+      <p className="truncate text-xs text-white/55">{admin.email}</p>
       <form action={adminLogout} className="mt-3">
-        <button className="w-full rounded-md border border-white/15 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/5 hover:text-white">
+        <button className="w-full rounded-md border border-white/15 px-3 py-1.5 text-xs text-white/75 hover:bg-white/5 hover:text-white">
           Sign out
         </button>
       </form>

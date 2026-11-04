@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { HeroTerminal } from "@/components/markets/hero-terminal";
-import { StickyTicker } from "@/components/markets/sticky-ticker";
 import { MarketOverview, TradingViewAttribution } from "@/components/markets/tradingview";
 import { CountUp, Reveal } from "@/components/motion";
 import { ButtonLink, Card } from "@/components/ui";
@@ -80,81 +78,16 @@ function Icon({ d, className = "size-5" }: { d: string; className?: string }) {
 function SectionHeading({ eyebrow, title, body }: { eyebrow: string; title: string; body?: string }) {
   return (
     <Reveal className="max-w-2xl">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">{eyebrow}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold">{eyebrow}</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h2>
       {body && <p className="mt-3 text-muted">{body}</p>}
     </Reveal>
   );
 }
 
-const enter = (ms: number) => ({ "--delay": `${ms}ms` }) as React.CSSProperties;
-
 export default function HomePage() {
   return (
     <>
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="grid-bg animate-pan absolute inset-0" aria-hidden />
-        <div className="animate-drift absolute -top-40 left-1/4 h-[32rem] w-[48rem] rounded-full bg-brand/14 blur-[120px]" aria-hidden />
-        <div className="animate-drift-slow absolute -bottom-40 right-0 h-[26rem] w-[36rem] rounded-full bg-up/8 blur-[120px]" aria-hidden />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-14 sm:px-6 md:pt-20 lg:grid-cols-[1fr_1.05fr]">
-          <div>
-            <p
-              className="animate-enter inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1 text-xs text-muted"
-              style={enter(0)}
-            >
-              <span className="live-dot size-1.5 rounded-full bg-up" />
-              Live markets · Stocks · Indices · Commodities · Metals
-            </p>
-            <h1 className="animate-enter mt-6 text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl" style={enter(120)}>
-              Trade global markets
-              <br />
-              <span className="text-shimmer bg-gradient-to-r from-brand via-sky-300 to-up bg-clip-text text-transparent">
-                with precision.
-              </span>
-            </h1>
-            <p className="animate-enter mt-6 max-w-xl text-lg text-muted" style={enter(240)}>
-              Professional charts, live prices and a single dashboard for your funds. Deposit, trade and withdraw with
-              full visibility at every step.
-            </p>
-            <div className="animate-enter mt-8 flex flex-wrap gap-3" style={enter(360)}>
-              <ButtonLink href="/signup" className="px-6 py-3 text-base">
-                Open live account
-              </ButtonLink>
-              <ButtonLink href="/markets" variant="secondary" className="px-6 py-3 text-base">
-                Explore markets
-              </ButtonLink>
-            </div>
-            <dl className="animate-enter mt-12 grid max-w-lg grid-cols-4 gap-4 border-t border-line pt-6" style={enter(480)}>
-              <div>
-                <dd className="font-mono text-2xl font-semibold"><CountUp to={4} /></dd>
-                <dt className="mt-1 text-xs text-muted">Markets</dt>
-              </div>
-              <div>
-                <dd className="font-mono text-2xl font-semibold"><CountUp to={500} prefix="1:" /></dd>
-                <dt className="mt-1 text-xs text-muted">Max leverage</dt>
-              </div>
-              <div>
-                <dd className="font-mono text-2xl font-semibold"><CountUp to={50} prefix="$" /></dd>
-                <dt className="mt-1 text-xs text-muted">Minimum deposit</dt>
-              </div>
-              <div>
-                <dd className="font-mono text-2xl font-semibold">24/5</dd>
-                <dt className="mt-1 text-xs text-muted">Client support</dt>
-              </div>
-            </dl>
-          </div>
-          <div className="animate-enter" style={enter(300)}>
-            <div className="animate-float">
-              <HeroTerminal />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Live prices — pins under the header while scrolling */}
-      <StickyTicker />
-
       {/* Markets */}
       <section id="markets" className="mx-auto max-w-7xl scroll-mt-32 px-4 py-24 sm:px-6">
         <SectionHeading
@@ -171,7 +104,7 @@ export default function HomePage() {
                   className="group flex h-full flex-col rounded-2xl border border-line bg-surface p-6 transition-all duration-300 hover:-translate-y-1 hover:border-brand/50 hover:shadow-xl hover:shadow-brand/10"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="grid size-11 place-items-center rounded-xl bg-brand/10 text-brand ring-1 ring-brand/20 transition-all group-hover:bg-brand group-hover:text-white group-hover:shadow-lg group-hover:shadow-brand/40">
+                    <span className="grid size-11 place-items-center rounded-xl bg-brand/10 text-brand ring-1 ring-brand/20 transition-all group-hover:bg-brand group-hover:text-on-brand group-hover:shadow-lg group-hover:shadow-brand/40">
                       <Icon d={c.icon} />
                     </span>
                     <span className="text-muted transition-transform group-hover:translate-x-1 group-hover:text-brand">→</span>
@@ -261,7 +194,7 @@ export default function HomePage() {
               >
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-medium">{a.name}</h3>
-                  {a.featured && <span className="rounded-full bg-brand px-2.5 py-0.5 text-xs font-medium text-white">Most popular</span>}
+                  {a.featured && <span className="rounded-full bg-brand px-2.5 py-0.5 text-xs font-medium text-on-brand">Most popular</span>}
                 </div>
                 <p className="mt-5 text-sm text-muted">Minimum deposit</p>
                 <p className="font-mono text-4xl font-semibold">

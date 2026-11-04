@@ -1,4 +1,4 @@
-// Brand constants. The logo artwork is public/brand/bivora-logo.svg (1200×1200, on the site background colour).
+// Brand constants. The logo artwork is public/brand/bivora-logo.svg (square, transparent background).
 
 export const BRAND = {
   name: "Bivora",
@@ -6,5 +6,5 @@ export const BRAND = {
   description:
     "Bivora is a multi-asset trading platform for stocks, indices, commodities and metals. Fund your account, follow live prices and manage deposits and withdrawals from one secure dashboard.",
   logoPath: "/brand/bivora-logo.svg",
-  background: "#05070c",
+  background: "#070908",
 };

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { Alert, Field, Input } from "@/components/ui";
+import { PhoneInput } from "@/components/phone-input";
 import { SubmitButton } from "@/components/submit-button";
 import { signup } from "../actions";
 
@@ -23,21 +24,10 @@ export function SignupForm() {
       <Field label="Email">
         <Input name="email" type="email" autoComplete="email" required defaultValue={v.email} />
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Phone">
-          <Input name="phone" type="tel" autoComplete="tel" defaultValue={v.phone} />
-        </Field>
-        <Field label="Country">
-          <Input name="country" autoComplete="country-name" defaultValue={v.country} />
-        </Field>
-      </div>
+      <PhoneInput defaultValue={v.phone} />
       <Field label="Password" hint="At least 8 characters, with a letter and a number.">
         <Input name="password" type="password" autoComplete="new-password" required minLength={8} />
       </Field>
-      <label className="flex items-start gap-2 text-sm text-muted">
-        <input type="checkbox" name="terms" className="mt-0.5 accent-brand" defaultChecked={v.terms === "on"} />
-        I accept the terms of service and understand that trading leveraged products carries a high level of risk.
-      </label>
       <SubmitButton className="w-full" pendingText="Creating account…">
         Create account
       </SubmitButton>

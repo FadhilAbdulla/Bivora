@@ -72,3 +72,25 @@ export async function adjustUserBalance(_prev: FormState, formData: FormData): P
   refresh();
   return { success: "Balance adjusted." };
 }
+
+const kycSchema = z.object({
+  userId: z.string().min(1),
+  decision: z.enum(["APPROVED", "REJECTED"]),
+  note: z.string().trim().max(500).optional(),
+});
+
+export async function reviewKyc(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireAdmin();
+  const parsed = kycSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Invalid request." };
+  const { userId, decision, note } = parsed.data;
+  if (decision === "REJECTED" && !note) return { error: "Enter a reason so the client knows what to fix." };
+
+  const { count } = await db.user.updateMany({
+    where: { id: userId, kycStatus: "PENDING" },
+    data: { kycStatus: decision, kycNote: note || null, kycReviewedAt: new Date() },
+  });
+  if (count === 0) return { error: "These documents have already been reviewed." };
+  refresh();
+  return { success: "Saved." };
+}
