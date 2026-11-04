@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="168" viewBox="0 0 380 84" fill="none">
+  <defs>
+    <linearGradient id="tile" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3A7BFD"/>
+      <stop offset="0.48" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#16C784"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(10 10)">
+    <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#tile)"/>
+    <rect x="4.75" y="4.75" width="54.5" height="54.5" rx="15.25" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="1.5"/>
+    <path d="M19 13.5V50.5" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+    <path d="M20 16.5H34.5C42.2 16.5 46.5 19.9 46.5 25.5C46.5 31.1 42.2 34.5 34.5 34.5H20" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M20 34.5H35.5C44.2 34.5 49 38.1 49 43.6C49 49.2 44.2 51.5 35.5 51.5H20" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M25.5 46L32.5 39L38 43L49 29.5" stroke="#0A1630" stroke-width="4.25" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M42.75 30L49.5 29L49 35.7" stroke="#0A1630" stroke-width="4.25" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <text x="88" y="57" fill="#0F1729" font-family="Geist, Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="45" font-weight="650" letter-spacing="-1.8">Bivora</text>
+</svg>

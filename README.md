@@ -39,10 +39,9 @@ Open http://localhost:3000. Clients use `/login`; the super admin signs in at `/
 
 ## Brand
 
-- Logo mark: a "B" whose stem is a candlestick, on the blue→green brand gradient
-  (`src/lib/brand.ts`, rendered by `src/components/logo.tsx`).
-- Files for print/social use: `public/brand/bivora-mark.svg`, `bivora-logo-dark.svg` (for dark
-  backgrounds) and `bivora-logo-light.svg` (for light backgrounds).
+- Logo: `public/brand/bivora-logo.svg` (1200×1200, on the site background colour), used everywhere
+  through `src/components/logo.tsx`. Earlier logos and the original black version are kept in
+  `old-logos/`, which the website does not serve.
 - Favicon `src/app/icon.svg`, Apple touch icon `src/app/apple-icon.tsx`, share image
   `src/app/opengraph-image.tsx` (also used for Twitter/X).
 - Set `NEXT_PUBLIC_SITE_URL` to the real domain in production so share previews use absolute URLs.

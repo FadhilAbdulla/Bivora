@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
-import { BRAND, markSvg } from "@/lib/brand";
+import { BRAND } from "@/lib/brand";
+import { logoDataUri } from "@/lib/logo-image";
 
 export const alt = "Bivora — trade stocks, indices, commodities and metals from one account";
 export const size = { width: 1200, height: 630 };
@@ -24,7 +25,7 @@ export default async function OpengraphImage() {
     readFile(join(fontDir, "Geist-Regular.ttf")),
     readFile(join(fontDir, "Geist-SemiBold.ttf")),
   ]);
-  const mark = `data:image/svg+xml;base64,${Buffer.from(markSvg({ size: 96 })).toString("base64")}`;
+  const mark = await logoDataUri();
   const chartHeight = 300;
   // Map the candle range (30–140) onto the chart height.
   const scale = (v: number) => chartHeight - ((v - 30) / 110) * chartHeight;
@@ -48,7 +49,7 @@ export default async function OpengraphImage() {
         {/* Left: brand + copy */}
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", width: 640 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
-            <img src={mark} width={84} height={84} alt="" />
+            <img src={mark} width={84} height={84} alt="" style={{ borderRadius: 18 }} />
             <div style={{ fontSize: 56, fontWeight: 600, letterSpacing: -1.5 }}>{BRAND.name}</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

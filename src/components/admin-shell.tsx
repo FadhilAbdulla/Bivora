@@ -3,6 +3,7 @@ import Link from "next/link";
 import { adminLogout } from "@/app/admin/auth-actions";
 import { getCurrentAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { LogoMark } from "./logo";
 import { MobileNav } from "./mobile-nav";
 import { NavLinkList, NavLinks, type NavItem } from "./nav-links";
 import { Skeleton } from "./ui";
@@ -13,11 +14,7 @@ const navStyles =
 function Brand() {
   return (
     <Link href="/admin" className="flex h-16 shrink-0 items-center gap-2.5 px-5">
-      <span className="grid size-8 place-items-center rounded-lg bg-brand text-white">
-        <svg viewBox="0 0 24 24" className="size-4.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" />
-        </svg>
-      </span>
+      <LogoMark className="size-8" />
       <span className="leading-tight">
         <span className="block text-sm font-semibold text-white">Bivora</span>
         <span className="block text-[11px] uppercase tracking-wider text-slate-400">Admin console</span>
