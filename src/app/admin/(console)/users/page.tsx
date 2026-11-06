@@ -39,14 +39,31 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
         title="Clients"
         description="Every registered account, its balance and status."
         action={
-          <form className="w-full sm:w-72">
-            <Input name="q" placeholder="Search name or email…" defaultValue={query} />
+          <form className="relative w-full sm:w-72">
+            <Input name="q" placeholder="Search name or email…" defaultValue={query} className={query ? "pr-10" : undefined} />
+            {query && (
+              <Link
+                href="/admin/users"
+                aria-label="Clear search"
+                className="absolute inset-y-0 right-0 grid w-10 place-items-center rounded-r-lg text-muted hover:text-foreground"
+              >
+                <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </Link>
+            )}
           </form>
         }
       />
       <Card>
         {users.length === 0 ? (
-          <EmptyState title="No clients found." />
+          <EmptyState title="No clients found.">
+            {query && (
+              <Link href="/admin/users" className="font-medium text-brand hover:underline">
+                Clear search
+              </Link>
+            )}
+          </EmptyState>
         ) : (
           <>
           <ul className="divide-y divide-line md:hidden">
