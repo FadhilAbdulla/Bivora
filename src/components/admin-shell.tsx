@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { LogoMark } from "./logo";
 import { MobileNav } from "./mobile-nav";
 import { NavLinkList, NavLinks, type NavItem } from "./nav-links";
+import { Toaster } from "./toast";
 import { Skeleton } from "./ui";
 
 const navStyles =
@@ -57,6 +58,7 @@ export function AdminShell({ nav, children }: { nav: NavItem[]; children: ReactN
           <span className="ml-auto hidden rounded-full border border-line px-2.5 py-1 text-xs text-muted sm:inline">Super admin</span>
         </header>
         <main className="flex-1 px-4 py-6 sm:px-8 sm:py-8">{children}</main>
+        <Toaster />
       </div>
     </div>
   );

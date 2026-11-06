@@ -19,7 +19,6 @@ export default function AdminLoginPage() {
         <div className="rounded-xl border border-line bg-surface p-6 shadow-sm">
           <AdminLoginForm />
         </div>
-        <p className="mt-6 text-center text-xs text-muted">Admin sessions expire after 8 hours.</p>
       </div>
     </div>
   );

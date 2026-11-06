@@ -1,11 +1,12 @@
 "use server";
 
+import bcrypt from "bcryptjs";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { approveClient, resendCredentials } from "@/lib/client-approval";
 import { db } from "@/lib/db";
-import type { FormState } from "@/lib/form";
+import { formValues, type FormState } from "@/lib/form";
 import { FundError, adjustBalance, approveFundRequest, rejectFundRequest } from "@/lib/funds";
 
 const reviewSchema = z.object({
@@ -109,4 +110,56 @@ export async function resendArkCredentials(_prev: FormState, formData: FormData)
   if (error || warning) return { error: error ?? warning };
   refresh();
   return { success: "New login details sent." };
+}
+
+const adminPassword = z
+  .string()
+  .min(12, "Password must be at least 12 characters.")
+  .regex(/[A-Za-z]/, "Password must contain a letter.")
+  .regex(/[0-9]/, "Password must contain a number.");
+
+const newAdminSchema = z.object({
+  firstName: z.string().trim().min(1, "Enter a first name.").max(60),
+  lastName: z.string().trim().min(1, "Enter a last name.").max(60),
+  email: z.email("Enter a valid email address.").trim().toLowerCase(),
+  password: adminPassword,
+});
+
+export async function createAdmin(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireAdmin();
+  const values = formValues(formData, ["password"]);
+  const parsed = newAdminSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message, values };
+
+  const { password, ...data } = parsed.data;
+  const existing = await db.user.findUnique({ where: { email: data.email } });
+  if (existing) {
+    return {
+      error: existing.role === "SUPER_ADMIN" ? "This email is already an admin." : "A client account already uses this email. Use a different email.",
+      values,
+    };
+  }
+
+  await db.user.create({ data: { ...data, role: "SUPER_ADMIN", passwordHash: await bcrypt.hash(password, 12) } });
+  refresh();
+  return { success: `${data.firstName} can now sign in at /admin/login.` };
+}
+
+const adminPasswordSchema = z
+  .object({ currentPassword: z.string().min(1, "Enter your current password."), newPassword: adminPassword, confirmPassword: z.string() })
+  .refine((d) => d.newPassword === d.confirmPassword, { message: "New passwords don't match." });
+
+export async function changeAdminPassword(_prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requireAdmin();
+  const parsed = adminPasswordSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  if (!admin.passwordHash || !(await bcrypt.compare(parsed.data.currentPassword, admin.passwordHash))) {
+    return { error: "Current password is incorrect." };
+  }
+  await db.user.update({
+    where: { id: admin.id },
+    data: { passwordHash: await bcrypt.hash(parsed.data.newPassword, 12) },
+  });
+  return { success: "Password changed." };
 }

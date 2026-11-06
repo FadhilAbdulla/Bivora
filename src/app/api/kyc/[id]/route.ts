@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { getCurrentAdmin, getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canEditKyc } from "@/lib/kyc";
-import { readDocument, removeDocument } from "@/lib/kyc-storage";
+import { createViewLink, removeDocument } from "@/lib/kyc-storage";
 
 const notFound = () => Response.json({ error: "Not found." }, { status: 404 });
 
@@ -16,16 +16,10 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/kyc/[id
   const allowed = (await getCurrentAdmin()) ?? ((await getCurrentUser())?.id === doc.userId ? true : null);
   if (!allowed) return notFound();
 
-  const file = await readDocument(doc.storageKey).catch(() => null);
-  if (!file) return notFound();
-
-  return new Response(new Uint8Array(file), {
-    headers: {
-      "Content-Type": doc.mimeType,
-      "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(doc.fileName)}`,
-      "Cache-Control": "private, no-store",
-      "X-Content-Type-Options": "nosniff",
-    },
+  // Redirected rather than passed through here, because Vercel limits responses to 4.5 MB.
+  return new Response(null, {
+    status: 302,
+    headers: { Location: await createViewLink(doc), "Cache-Control": "private, no-store" },
   });
 }
 

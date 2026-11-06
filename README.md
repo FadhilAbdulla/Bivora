@@ -39,6 +39,7 @@ Open http://localhost:3000. Clients use `/login`; the super admin signs in at `/
 | `/admin` | super admin | Totals and the review queue |
 | `/admin/requests` | super admin | All requests, filter by status/type, approve/reject |
 | `/admin/users` | super admin | Clients, balances, suspend/reactivate, manual adjustments |
+| `/admin/admins` | super admin | Add and deactivate admins, change your own password |
 
 ## Brand
 
@@ -92,6 +93,10 @@ background, repeated after a rejection. Super admins review documents from the c
 - Four steps, one per screen: passport, Emirates ID, proof of address, terms.
 - Passport: front and back. Emirates ID: front and back. Proof of address: one page. A PDF under
   Front counts as both sides. Each can also be captured with the camera.
+- JPG, PNG, WebP or PDF up to 10 MB, checked from the file's contents.
+- Files are kept in a private Cloudflare R2 bucket. Browsers upload straight to it with short-lived links, and
+  the app then checks each file before accepting it. They open only through `/api/kyc/[id]`, for the owner or
+  a super admin.
 - The whole dashboard stays locked until a super admin approves the documents. Clients wait on a review
   screen, and fund requests can't be approved for an unverified client.
 - Approving creates the client's ARK account and emails their trading login (`src/lib/client-approval.ts`).
@@ -102,13 +107,8 @@ Emails go through Resend (`src/lib/email.ts`): welcome, password reset and tradi
 `RESEND_API_KEY` and `EMAIL_FROM`. Without them nothing sends, and forgot password says it's unavailable.
 
 Google login needs `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, from an OAuth client in Google Cloud with
-`<site>/auth/google/callback` as a redirect URI. The button stays hidden without them. Google is for signing in only: new accounts open through signup, which requires a phone number.
-- JPG, PNG, WebP or PDF up to 10 MB, checked from the file's contents.
-- Files are stored outside `public/` (`KYC_STORAGE_DIR`, default `storage/kyc`, ignored by git) and served
-  only through `/api/kyc/[id]` to the owner or a super admin.
-
-Identity documents need durable, encrypted storage in production. A server's local disk is not enough, and
-on serverless hosts it isn't kept at all; swap `src/lib/kyc-storage.ts` for private object storage.
+`<site>/auth/google/callback` as a redirect URI. The button stays hidden without them. Google is for signing in
+only: new accounts open through signup, which requires a phone number.
 
 ## How funds work
 

@@ -103,11 +103,23 @@ function DocumentSlot({
     }
     setBusy(true);
     try {
-      const body = new FormData();
-      body.set("type", type);
-      body.set("slot", def.slot);
-      body.set("file", file);
-      const res = await fetch("/api/kyc", { method: "POST", body });
+      const post = (path: string, body: object) =>
+        fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+      const link = await post("/api/kyc/upload-link", { type, slot: def.slot, size: file.size });
+      const { url, storageKey, error: linkError } = await link.json().catch(() => ({}));
+      if (!link.ok) {
+        setError(linkError ?? "Upload failed. Please try again.");
+        return;
+      }
+
+      const sent = await fetch(url, { method: "PUT", body: file });
+      if (!sent.ok) {
+        setError("Upload failed. Please try again.");
+        return;
+      }
+
+      const res = await post("/api/kyc", { type, slot: def.slot, storageKey, fileName: file.name });
       const json = await res.json().catch(() => null);
       if (!res.ok) setError(json?.error ?? "Upload failed. Please try again.");
       else onUploaded(json.document, json.removedId);
