@@ -40,6 +40,7 @@ Open http://localhost:3000. Clients use `/login`; the super admin signs in at `/
 | `/admin/requests` | super admin | All requests, filter by status/type, approve/reject |
 | `/admin/users` | super admin | Clients, balances, suspend/reactivate, manual adjustments |
 | `/admin/admins` | super admin | Add and deactivate admins, change your own password |
+| `/admin/settings` | super admin | ARK connection details and dealer password |
 
 ## Brand
 
@@ -100,8 +101,10 @@ background, repeated after a rejection. Super admins review documents from the c
 - The dashboard opens once documents and terms are submitted, with a notice while they're under review.
   Deposits and withdrawals stay locked until a super admin approves the documents.
 - Approving creates the client's ARK account and emails their trading login (`src/lib/client-approval.ts`).
-  The password is never stored, so "Resend login details" sets a new one. Approval is refused until the
-  `ARK_*` and email settings are in place.
+  The client's password is never stored, so "Resend login details" sets a new one. Approval is refused until
+  ARK settings and email are in place.
+- ARK connection details are managed at `/admin/settings` and apply straight away. The dealer password is
+  encrypted with `SETTINGS_ENCRYPTION_KEY`, which must match everywhere that uses this database.
 
 Emails go through Resend (`src/lib/email.ts`): welcome, password reset and trading login details. Set
 `RESEND_API_KEY` and `EMAIL_FROM`. Without them nothing sends, and forgot password says it's unavailable.

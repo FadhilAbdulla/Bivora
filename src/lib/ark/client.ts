@@ -1,34 +1,45 @@
 import "server-only";
 import { randomInt } from "node:crypto";
+import { db } from "../db";
+import { SecretKeyError, decryptSecret } from "../secrets";
 
-// Creates client accounts on ARK when a super admin approves them.
+// Creates client accounts on ARK when a super admin approves them. The connection details are
+// managed at /admin/settings and read fresh each time, so a new dealer password applies at once.
 // Endpoint reference: docs/ark-api.md
-
-const REQUIRED_ENV = [
-  "ARK_API_URL",
-  "ARK_COMPANY_NAME",
-  "ARK_DEALER_USERNAME",
-  "ARK_DEALER_PASSWORD",
-  "ARK_PARENT_ID",
-  "ARK_GENERIC_POLICY_ID",
-  "ARK_CURRENCIES_POLICY_ID",
-  "ARK_CURRENCY_ID",
-  "ARK_TRADING_URL",
-] as const;
-
-export function missingArkSettings() {
-  return REQUIRED_ENV.filter((key) => !process.env[key]);
-}
 
 export class ArkError extends Error {}
 
+export type ArkConfig = {
+  apiUrl: string;
+  companyName: string;
+  dealerUsername: string;
+  dealerPassword: string;
+  parentId: number;
+  genericPolicyId: number;
+  currenciesPolicyId: number;
+  currencyId: number;
+  tradingUrl: string;
+};
+
+export async function loadArkConfig(): Promise<ArkConfig> {
+  const saved = await db.arkSettings.findUnique({ where: { id: "ark" } });
+  if (!saved) throw new ArkError("Add the ARK connection details under ARK settings first.");
+  const { dealerPasswordEnc, ...rest } = saved;
+  try {
+    return { ...rest, dealerPassword: decryptSecret(dealerPasswordEnc) };
+  } catch (e) {
+    if (e instanceof SecretKeyError) throw new ArkError(e.message);
+    throw e;
+  }
+}
+
 type Envelope<T> = { data?: T; message?: string; success?: boolean };
 
-async function arkFetch<T>(path: string, init: RequestInit & { token?: string }) {
+async function arkFetch<T>(config: ArkConfig, path: string, init: RequestInit & { token?: string }) {
   const { token, ...rest } = init;
   let response: Response;
   try {
-    response = await fetch(`${process.env.ARK_API_URL!.replace(/\/$/, "")}${path}`, {
+    response = await fetch(`${config.apiUrl.replace(/\/$/, "")}${path}`, {
       ...rest,
       cache: "no-store",
       signal: AbortSignal.timeout(20_000),
@@ -41,13 +52,13 @@ async function arkFetch<T>(path: string, init: RequestInit & { token?: string })
   return { ok: response.ok && body?.success !== false, status: response.status, data: body?.data, message: body?.message };
 }
 
-async function loginDealer() {
-  const result = await arkFetch<{ token?: string }>("/login/public/api/v2/login", {
+export async function loginDealer(config: ArkConfig) {
+  const result = await arkFetch<{ token?: string }>(config, "/login/public/api/v2/login", {
     method: "POST",
     body: JSON.stringify({
-      companyName: process.env.ARK_COMPANY_NAME,
-      userName: process.env.ARK_DEALER_USERNAME,
-      password: process.env.ARK_DEALER_PASSWORD,
+      companyName: config.companyName,
+      userName: config.dealerUsername,
+      password: config.dealerPassword,
     }),
   });
   if (!result.ok || !result.data?.token) throw new ArkError(`ARK login failed: ${result.message ?? result.status}`);
@@ -56,8 +67,8 @@ async function loginDealer() {
 
 type ArkUser = { userID?: number; userId?: number; id?: number; accountID?: number; accountId?: number };
 
-async function findByUsername(token: string, username: string) {
-  const result = await arkFetch<ArkUser>(`/admin/public/api/v2/username/${encodeURIComponent(username)}`, {
+async function findByUsername(config: ArkConfig, token: string, username: string) {
+  const result = await arkFetch<ArkUser>(config, `/admin/public/api/v2/username/${encodeURIComponent(username)}`, {
     method: "GET",
     token,
   });
@@ -67,8 +78,8 @@ async function findByUsername(token: string, username: string) {
   return arkUserId == null ? null : { arkUserId: String(arkUserId), arkAccountId: String(accountID ?? accountId ?? "") || null };
 }
 
-async function setPassword(token: string, arkUserId: string, password: string) {
-  const result = await arkFetch(`/admin/public/api/v2/user/${arkUserId}`, {
+async function setPassword(config: ArkConfig, token: string, arkUserId: string, password: string) {
+  const result = await arkFetch(config, `/admin/public/api/v2/user/${arkUserId}`, {
     method: "PUT",
     token,
     body: JSON.stringify({ password, forceChangePassword: true }),
@@ -93,7 +104,7 @@ export function arkUsernameFor(userId: string) {
   return `bv${userId.slice(-10).toLowerCase()}`;
 }
 
-export async function provisionArkAccount(client: {
+export async function provisionArkAccount(config: ArkConfig, client: {
   id: string;
   email: string;
   firstName: string;
@@ -101,16 +112,16 @@ export async function provisionArkAccount(client: {
   phone: string | null;
   country: string;
 }, password: string) {
-  const token = await loginDealer();
+  const token = await loginDealer(config);
   const username = arkUsernameFor(client.id);
 
-  const existing = await findByUsername(token, username);
+  const existing = await findByUsername(config, token, username);
   if (existing) {
-    await setPassword(token, existing.arkUserId, password);
+    await setPassword(config, token, existing.arkUserId, password);
     return { ...existing, arkUsername: username };
   }
 
-  const created = await arkFetch("/admin/public/api/v2/user", {
+  const created = await arkFetch(config, "/admin/public/api/v2/user", {
     method: "POST",
     token,
     body: JSON.stringify({
@@ -120,10 +131,10 @@ export async function provisionArkAccount(client: {
       isLocked: false,
       isVerified: true,
       accountID: -1,
-      parentId: Number(process.env.ARK_PARENT_ID),
-      genericPolicyID: Number(process.env.ARK_GENERIC_POLICY_ID),
-      currenciesPolicyID: Number(process.env.ARK_CURRENCIES_POLICY_ID),
-      userCurrencyId: Number(process.env.ARK_CURRENCY_ID),
+      parentId: config.parentId,
+      genericPolicyID: config.genericPolicyId,
+      currenciesPolicyID: config.currenciesPolicyId,
+      userCurrencyId: config.currencyId,
       roboDealerPolicyId: -1,
       accountMirroringPolicyId: -1,
       accountMirroringAccountIds: [],
@@ -148,11 +159,11 @@ export async function provisionArkAccount(client: {
   });
   if (!created.ok) throw new ArkError(`ARK couldn't create the account: ${created.message ?? created.status}`);
 
-  const account = await findByUsername(token, username);
+  const account = await findByUsername(config, token, username);
   if (!account) throw new ArkError("ARK created the account but didn't return its details. Try approving again.");
   return { ...account, arkUsername: username };
 }
 
-export async function resetArkPassword(arkUserId: string, password: string) {
-  await setPassword(await loginDealer(), arkUserId, password);
+export async function resetArkPassword(config: ArkConfig, arkUserId: string, password: string) {
+  await setPassword(config, await loginDealer(config), arkUserId, password);
 }

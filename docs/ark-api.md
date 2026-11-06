@@ -50,6 +50,7 @@ Responses share the envelope `{ data, message, httpStatus, errorCode, success }`
 - ARK also has its own deposit/withdrawal request workflow (`/admin/public/api/v2/depositRequest`,
   `/trading/public/api/v2/cashRequest`). Bivora keeps requests and approvals in its own database and
   only posts the final money transaction to ARK on approval.
+- These details are entered at `/admin/settings`, not in environment variables.
 - To confirm with the broker: company name, dealer credentials, the `parentId` (office) for new
   clients, the policy IDs (`genericPolicyID`, `currenciesPolicyID`) and `userCurrencyId` to assign, the
   trading platform's login URL, and any password rules.

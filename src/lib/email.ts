@@ -97,8 +97,9 @@ export function sendTradingCredentials(client: {
   firstName: string;
   username: string;
   password: string;
+  tradingUrl: string;
 }) {
-  const url = process.env.ARK_TRADING_URL!;
+  const url = client.tradingUrl;
   const row = (label: string, value: string) =>
     `<tr><td style="padding:10px 14px;color:#5f6b66;font-size:14px;">${label}</td><td style="padding:10px 14px;font-family:Menlo,Consolas,monospace;font-size:15px;font-weight:600;color:#10201a;">${escapeHtml(value)}</td></tr>`;
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { ArkError, generateArkPassword, missingArkSettings, provisionArkAccount, resetArkPassword } from "./ark/client";
+import { ArkError, type ArkConfig, generateArkPassword, loadArkConfig, provisionArkAccount, resetArkPassword } from "./ark/client";
 import { countryByIso, parsePhone } from "./countries";
 import { db } from "./db";
 import { missingEmailSettings, sendTradingCredentials } from "./email";
@@ -11,14 +11,21 @@ const EMAIL_FAILED = "The ARK account is ready, but the email didn't send. Use R
 // An approval that hasn't finished by now was interrupted, so another attempt may take over.
 const STALE_MS = 2 * 60 * 1000;
 
-function setupError() {
-  const missing = [...missingArkSettings(), ...missingEmailSettings()];
-  return missing.length ? `Approval needs these settings first: ${missing.join(", ")}.` : null;
+/** Everything approval depends on, checked up front so nothing happens halfway. */
+async function prepare(): Promise<{ config: ArkConfig } | { error: string }> {
+  const missing = missingEmailSettings();
+  if (missing.length) return { error: `Approval needs these settings first: ${missing.join(", ")}.` };
+  try {
+    return { config: await loadArkConfig() };
+  } catch (e) {
+    if (e instanceof ArkError) return { error: e.message };
+    throw e;
+  }
 }
 
 async function emailCredentials(
   userId: string,
-  client: { email: string; firstName: string; username: string; password: string },
+  client: { email: string; firstName: string; username: string; password: string; tradingUrl: string },
 ) {
   try {
     await sendTradingCredentials(client);
@@ -32,8 +39,8 @@ async function emailCredentials(
 
 /** Creates the client's ARK account, opens their Bivora account, and emails their trading login. */
 export async function approveClient(userId: string): Promise<ApprovalResult> {
-  const notReady = setupError();
-  if (notReady) return { error: notReady };
+  const ready = await prepare();
+  if ("error" in ready) return ready;
 
   const user = await db.user.findFirst({
     where: { id: userId, role: "USER" },
@@ -58,6 +65,7 @@ export async function approveClient(userId: string): Promise<ApprovalResult> {
   let account;
   try {
     account = await provisionArkAccount(
+      ready.config,
       { ...user, country: user.country ?? countryByIso(parsePhone(user.phone).iso).name },
       password,
     );
@@ -77,21 +85,22 @@ export async function approveClient(userId: string): Promise<ApprovalResult> {
     firstName: user.firstName,
     username: account.arkUsername,
     password,
+    tradingUrl: ready.config.tradingUrl,
   });
   return sent ? {} : { warning: EMAIL_FAILED };
 }
 
 /** Passwords are never stored, so resending always sets a new one on ARK first. */
 export async function resendCredentials(userId: string): Promise<ApprovalResult> {
-  const notReady = setupError();
-  if (notReady) return { error: notReady };
+  const ready = await prepare();
+  if ("error" in ready) return ready;
 
   const user = await db.user.findFirst({ where: { id: userId, role: "USER", kycStatus: "APPROVED" } });
   if (!user?.arkUserId || !user.arkUsername) return { error: "This client has no ARK account yet." };
 
   const password = generateArkPassword();
   try {
-    await resetArkPassword(user.arkUserId, password);
+    await resetArkPassword(ready.config, user.arkUserId, password);
   } catch (e) {
     if (e instanceof ArkError) return { error: e.message };
     throw e;
@@ -101,6 +110,7 @@ export async function resendCredentials(userId: string): Promise<ApprovalResult>
     firstName: user.firstName,
     username: user.arkUsername,
     password,
+    tradingUrl: ready.config.tradingUrl,
   });
   return sent ? {} : { warning: "ARK has a new password, but the email didn't send. Please try again." };
 }

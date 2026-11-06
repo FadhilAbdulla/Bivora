@@ -138,3 +138,29 @@ model ContactMessage {
 
   @@index([createdAt])
 }
+
+// The one set of details for connecting to ARK, managed at /admin/settings.
+// The dealer password is encrypted (see src/lib/secrets.ts).
+model ArkSettings {
+  id                 String   @id @default("ark")
+  apiUrl             String
+  companyName        String
+  dealerUsername     String
+  dealerPasswordEnc  String
+  parentId           Int
+  genericPolicyId    Int
+  currenciesPolicyId Int
+  currencyId         Int
+  tradingUrl         String
+  updatedAt          DateTime @updatedAt
+}
+
+// Who changed the ARK settings and which fields. Never the values.
+model ArkSettingsChange {
+  id         String   @id @default(cuid())
+  adminEmail String
+  fields     String
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
