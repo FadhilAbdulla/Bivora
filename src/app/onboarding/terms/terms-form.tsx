@@ -10,7 +10,7 @@ import { acceptTerms } from "../actions";
 function Done() {
   const router = useRouter();
   useEffect(() => {
-    const timer = setTimeout(() => router.replace("/onboarding/review"), 2000);
+    const timer = setTimeout(() => router.replace("/dashboard"), 2000);
     return () => clearTimeout(timer);
   }, [router]);
 
@@ -21,7 +21,7 @@ function Done() {
         <path className="draw-check" pathLength={1} d="M15 27l8 8 14-16" />
       </svg>
       <h2 className="mt-5 text-xl font-semibold tracking-tight">Documents submitted</h2>
-      <p className="mt-1 text-sm text-muted">Thank you. We&apos;ll review them now.</p>
+      <p className="mt-1 text-sm text-muted">We&apos;ll review them now. Taking you to your dashboard…</p>
     </div>
   );
 }

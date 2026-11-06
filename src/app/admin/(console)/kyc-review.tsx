@@ -37,6 +37,28 @@ export function KycReview({ userId }: { userId: string }) {
   );
 }
 
+/** Approve straight from the clients list, without opening the client's page. */
+export function QuickApprove({ userId, name }: { userId: string; name: string }) {
+  const [state, action, pending] = useActionState(reviewKyc, null);
+
+  return (
+    <form action={action} className="space-y-1">
+      <input type="hidden" name="userId" value={userId} />
+      <input type="hidden" name="decision" value="APPROVED" />
+      <Button
+        disabled={pending}
+        className="w-full"
+        onClick={(e) => {
+          if (!confirm(`Approve ${name}? This creates their ARK account and emails them their login details.`)) e.preventDefault();
+        }}
+      >
+        {pending ? "Working…" : "Approve"}
+      </Button>
+      {state?.error && <p className="max-w-64 text-left text-xs text-danger">{state.error}</p>}
+    </form>
+  );
+}
+
 export function ResendCredentials({ userId, sent }: { userId: string; sent: boolean }) {
   const [state, action, pending] = useActionState(resendArkCredentials, null);
 

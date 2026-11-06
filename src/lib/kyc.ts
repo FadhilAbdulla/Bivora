@@ -63,7 +63,7 @@ export function canEditKyc(status: string) {
   return status === "NOT_SUBMITTED" || status === "REJECTED";
 }
 
-/** Nothing can be done on an account until its documents have been approved. */
+/** Clients can look around while under review, but money only moves once their documents are approved. */
 export function isKycApproved(status: string) {
   return status === "APPROVED";
 }

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { CancelRequestButton } from "@/components/cancel-request-button";
 import { FundRequestTable } from "@/components/fund-request-table";
-import { Card, CardHeader, PageHeader } from "@/components/ui";
+import { Alert, Card, CardHeader, PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isKycApproved } from "@/lib/kyc";
 import { DepositForm } from "./deposit-form";
 
 export const metadata: Metadata = { title: "Deposit" };
@@ -22,7 +23,13 @@ export default async function DepositPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,24rem)_1fr]">
         <Card>
           <CardHeader title="New deposit" />
-          <DepositForm />
+          {isKycApproved(user.kycStatus) ? (
+            <DepositForm />
+          ) : (
+            <div className="p-5">
+              <Alert tone="info">You can deposit once your documents are approved.</Alert>
+            </div>
+          )}
         </Card>
         <Card className="min-w-0">
           <CardHeader title="Deposit history" />

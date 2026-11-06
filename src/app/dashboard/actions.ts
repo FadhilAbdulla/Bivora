@@ -15,6 +15,7 @@ import {
 import { db } from "@/lib/db";
 import { formValues, type FormState } from "@/lib/form";
 import { FundError, cancelFundRequest, createFundRequest } from "@/lib/funds";
+import { isKycApproved } from "@/lib/kyc";
 
 const amount = (min: number) =>
   z.coerce
@@ -43,9 +44,12 @@ const withdrawalSchema = z.object({
   userNote: z.string().trim().max(500).optional(),
 });
 
+const NOT_APPROVED = "Deposits and withdrawals open once your documents are approved.";
+
 export async function requestDeposit(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const values = formValues(formData);
+  if (!isKycApproved(user.kycStatus)) return { error: NOT_APPROVED, values };
   const parsed = depositSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message, values };
 
@@ -57,6 +61,7 @@ export async function requestDeposit(_prev: FormState, formData: FormData): Prom
 export async function requestWithdrawal(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const values = formValues(formData);
+  if (!isKycApproved(user.kycStatus)) return { error: NOT_APPROVED, values };
   const parsed = withdrawalSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message, values };
   const { bankAccountId, ...data } = parsed.data;

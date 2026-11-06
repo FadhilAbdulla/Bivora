@@ -97,8 +97,8 @@ background, repeated after a rejection. Super admins review documents from the c
 - Files are kept in a private Cloudflare R2 bucket. Browsers upload straight to it with short-lived links, and
   the app then checks each file before accepting it. They open only through `/api/kyc/[id]`, for the owner or
   a super admin.
-- The whole dashboard stays locked until a super admin approves the documents. Clients wait on a review
-  screen, and fund requests can't be approved for an unverified client.
+- The dashboard opens once documents and terms are submitted, with a notice while they're under review.
+  Deposits and withdrawals stay locked until a super admin approves the documents.
 - Approving creates the client's ARK account and emails their trading login (`src/lib/client-approval.ts`).
   The password is never stored, so "Resend login details" sets a new one. Approval is refused until the
   `ARK_*` and email settings are in place.

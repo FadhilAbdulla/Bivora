@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { db } from "./db";
-import { isKycApproved } from "./kyc";
+import { canEditKyc } from "./kyc";
 import { readSession } from "./session";
 import type { SessionKind } from "./session-token";
 
@@ -36,10 +36,10 @@ export function requireOnboardingUser() {
   return requireFor("client", "/login");
 }
 
-/** A signed-in client whose documents are approved. Everyone else stays in onboarding until they are. */
+/** A signed-in client who has submitted their documents. Everyone else, including rejected clients, must finish onboarding. */
 export async function requireUser() {
   const user = await requireFor("client", "/login");
-  if (!isKycApproved(user.kycStatus)) redirect("/onboarding");
+  if (canEditKyc(user.kycStatus)) redirect("/onboarding");
   return user;
 }
 

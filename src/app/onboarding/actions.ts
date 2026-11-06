@@ -33,6 +33,6 @@ export async function acceptTerms(_prev: FormState, formData: FormData): Promise
       kycSubmittedAt: new Date(),
     },
   });
-  // The form shows a short confirmation, then moves on to the review screen.
+  // The form shows a short confirmation, then moves on to the dashboard.
   return { success: "Submitted." };
 }

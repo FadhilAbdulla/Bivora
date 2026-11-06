@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { kycStage } from "@/lib/kyc";
 import { formatDate, formatMoney } from "@/lib/money";
+import { QuickApprove } from "../kyc-review";
 
 export const metadata: Metadata = { title: "Clients" };
 
@@ -50,8 +51,8 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
           <>
           <ul className="divide-y divide-line md:hidden">
             {users.map((u) => (
-              <li key={u.id}>
-                <Link href={`/admin/users/${u.id}`} className="flex items-center justify-between gap-3 px-4 py-3.5 text-sm">
+              <li key={u.id} className="py-3.5">
+                <Link href={`/admin/users/${u.id}`} className="flex items-center justify-between gap-3 px-4 text-sm">
                   <span className="min-w-0">
                     <span className="block font-medium">{u.firstName} {u.lastName}</span>
                     <span className="block truncate text-xs text-muted">{u.email}</span>
@@ -66,6 +67,11 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                     </span>
                   </span>
                 </Link>
+                {u.kycStatus === "PENDING" && (
+                  <div className="mt-2.5 px-4">
+                    <QuickApprove userId={u.id} name={`${u.firstName} ${u.lastName}`} />
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -80,6 +86,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                 <th className="text-right">Pending</th>
                 <th>Stage</th>
                 <th>Status</th>
+                <th><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -97,6 +104,9 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                   <td className="text-right">{u._count.fundRequests || "—"}</td>
                   <td><StatusBadge status={u.kycStatus} label={kycStage(u.kycStatus, u.kycDocuments)} /></td>
                   <td><StatusBadge status={u.status} /></td>
+                  <td className="text-right">
+                    {u.kycStatus === "PENDING" && <QuickApprove userId={u.id} name={`${u.firstName} ${u.lastName}`} />}
+                  </td>
                 </tr>
               ))}
             </tbody>

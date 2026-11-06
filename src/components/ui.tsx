@@ -175,7 +175,7 @@ export function StatusBadge({ status, label }: { status: string; label?: string 
   return (
     <span
       className={cn(
-        "inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+        "inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium capitalize",
         statusStyles[status] ?? "bg-line text-muted",
       )}
     >

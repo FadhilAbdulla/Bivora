@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { CancelRequestButton } from "@/components/cancel-request-button";
 import { FundRequestTable } from "@/components/fund-request-table";
-import { Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
+import { Alert, Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getAvailableBalance } from "@/lib/funds";
+import { isKycApproved } from "@/lib/kyc";
 import { maskAccountNumber } from "@/lib/bank";
 import { formatMoney } from "@/lib/money";
 import { WithdrawForm } from "./withdraw-form";
@@ -37,13 +38,19 @@ export default async function WithdrawPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,24rem)_1fr]">
         <Card>
           <CardHeader title="New withdrawal" />
-          <WithdrawForm
-            available={available.toFixed(2)}
-            bankAccounts={bankAccounts.map((a) => ({
-              id: a.id,
-              label: `${a.bankName} · ${maskAccountNumber(a.accountNumber)}${a.isDefault ? " (default)" : ""}`,
-            }))}
-          />
+          {isKycApproved(user.kycStatus) ? (
+            <WithdrawForm
+              available={available.toFixed(2)}
+              bankAccounts={bankAccounts.map((a) => ({
+                id: a.id,
+                label: `${a.bankName} · ${maskAccountNumber(a.accountNumber)}${a.isDefault ? " (default)" : ""}`,
+              }))}
+            />
+          ) : (
+            <div className="p-5">
+              <Alert tone="info">You can withdraw once your documents are approved.</Alert>
+            </div>
+          )}
         </Card>
         <Card className="min-w-0">
           <CardHeader title="Withdrawal history" />
