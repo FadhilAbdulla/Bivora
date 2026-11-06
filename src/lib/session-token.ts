@@ -12,7 +12,7 @@ export const SESSIONS = {
 
 export type SessionPayload = { userId: string };
 
-function key() {
+export function sessionKey() {
   const secret = process.env.SESSION_SECRET;
   if (!secret) throw new Error("SESSION_SECRET is not set");
   return new TextEncoder().encode(secret);
@@ -24,13 +24,13 @@ export async function signSession(kind: SessionKind, payload: SessionPayload) {
     .setAudience(kind)
     .setIssuedAt()
     .setExpirationTime(`${SESSIONS[kind].ttlSeconds}s`)
-    .sign(key());
+    .sign(sessionKey());
 }
 
 export async function verifySession(kind: SessionKind, token: string | undefined) {
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify<SessionPayload>(token, key(), {
+    const { payload } = await jwtVerify<SessionPayload>(token, sessionKey(), {
       algorithms: ["HS256"],
       audience: kind,
     });

@@ -278,3 +278,8 @@ dialog.modal.closing[open]::backdrop { animation: backdrop-out 0.2s ease-in forw
   dialog.modal[open], dialog.modal[open]::backdrop, dialog.modal.closing[open], dialog.modal.closing[open]::backdrop,
   .toast, .onboarding-panel, .step-in, .animate-pop, .draw-ring, .draw-check { animation: none; }
 }
+
+/* iPhones zoom the whole page when a field with text under 16px is tapped. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="file"]), select, textarea { font-size: 16px; }
+}

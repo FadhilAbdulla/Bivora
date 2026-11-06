@@ -12,7 +12,7 @@ export function isGoogleConfigured() {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
-export type GoogleProfile = { sub: string; email: string; firstName: string; lastName: string };
+export type GoogleProfile = { sub: string; email: string };
 
 /** Swaps the one-time code for Google's signed statement of who signed in. */
 export async function fetchGoogleProfile(code: string, origin: string, nonce: string): Promise<GoogleProfile | null> {
@@ -39,24 +39,16 @@ export async function fetchGoogleProfile(code: string, origin: string, nonce: st
   if (payload.nonce !== nonce || payload.email_verified !== true || typeof payload.email !== "string" || !payload.sub) {
     return null;
   }
-  const given = typeof payload.given_name === "string" ? payload.given_name : "";
-  const family = typeof payload.family_name === "string" ? payload.family_name : "";
-  const name = typeof payload.name === "string" ? payload.name : "";
-  return { sub: payload.sub, email: payload.email.toLowerCase(), firstName: given || name || "Client", lastName: family };
+  return { sub: payload.sub, email: payload.email.toLowerCase() };
 }
 
-/** Finds or creates the client for a Google sign-in. Returns why it can't sign in otherwise. */
+/** Finds the client for a Google sign-in. Accounts are only opened through signup, which collects a phone number. */
 export async function resolveGoogleUser(profile: GoogleProfile) {
   const user =
     (await db.user.findUnique({ where: { googleId: profile.sub } })) ??
     (await db.user.findUnique({ where: { email: profile.email } }));
 
-  if (!user) {
-    const created = await db.user.create({
-      data: { email: profile.email, googleId: profile.sub, firstName: profile.firstName, lastName: profile.lastName },
-    });
-    return { user: created };
-  }
+  if (!user) return { error: "no-account" };
 
   // Super admins sign in through /admin/login only.
   if (user.role !== "USER" || (user.googleId && user.googleId !== profile.sub)) return { error: "failed" };

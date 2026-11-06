@@ -11,9 +11,9 @@ export function SignupForm() {
   const v = state?.values ?? {};
 
   return (
-    <form action={action} className="mt-6 space-y-4">
+    <form action={action} className="mt-3 space-y-2.5 sm:mt-6 sm:space-y-4">
       {state?.error && <Alert tone="error">{state.error}</Alert>}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
         <Field label="First name">
           <Input name="firstName" autoComplete="given-name" required defaultValue={v.firstName} />
         </Field>
@@ -24,8 +24,8 @@ export function SignupForm() {
       <Field label="Email">
         <Input name="email" type="email" autoComplete="email" required defaultValue={v.email} />
       </Field>
-      <PhoneInput defaultValue={v.phone} />
-      <Field label="Password" hint="At least 8 characters, with a letter and a number.">
+      <PhoneInput defaultValue={v.phone} required openUp />
+      <Field label="Password" hint="8+ characters, with a letter and a number.">
         <Input name="password" type="password" autoComplete="new-password" required minLength={8} />
       </Field>
       <SubmitButton className="w-full" pendingText="Creating account…">

@@ -98,8 +98,11 @@ background, repeated after a rejection. Super admins review documents from the c
   The password is never stored, so "Resend login details" sets a new one. Approval is refused until the
   `ARK_*` and email settings are in place.
 
+Emails go through Resend (`src/lib/email.ts`): welcome, password reset and trading login details. Set
+`RESEND_API_KEY` and `EMAIL_FROM`. Without them nothing sends, and forgot password says it's unavailable.
+
 Google login needs `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, from an OAuth client in Google Cloud with
-`<site>/auth/google/callback` as a redirect URI. The button stays hidden without them.
+`<site>/auth/google/callback` as a redirect URI. The button stays hidden without them. Google is for signing in only: new accounts open through signup, which requires a phone number.
 - JPG, PNG, WebP or PDF up to 10 MB, checked from the file's contents.
 - Files are stored outside `public/` (`KYC_STORAGE_DIR`, default `storage/kyc`, ignored by git) and served
   only through `/api/kyc/[id]` to the owner or a super admin.

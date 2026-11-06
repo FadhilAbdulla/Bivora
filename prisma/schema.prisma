@@ -18,6 +18,7 @@ model User {
   // Empty for clients who only sign in with Google.
   passwordHash    String?
   googleId        String?   @unique
+  passwordResetSentAt DateTime?
   firstName       String
   lastName        String
   phone           String?

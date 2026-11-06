@@ -1,26 +1,7 @@
-"use client";
-
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { Alert } from "@/components/ui";
-
-const ERRORS: Record<string, string> = {
-  failed: "We couldn't sign you in with Google. Please try again, or use your email and password.",
-  suspended: "Your account is suspended. Please contact support.",
-};
-
-function GoogleError() {
-  const error = useSearchParams().get("google");
-  return error ? <div className="mb-3"><Alert tone="error">{ERRORS[error] ?? ERRORS.failed}</Alert></div> : null;
-}
-
 export function GoogleSignIn({ enabled }: { enabled: boolean }) {
   if (!enabled) return null;
   return (
-    <div className="mt-6">
-      <Suspense>
-        <GoogleError />
-      </Suspense>
+    <div className="mt-4 sm:mt-6">
       {/* A plain link: this leaves the site, so it must not be prefetched. */}
       <a
         href="/auth/google"
@@ -32,9 +13,9 @@ export function GoogleSignIn({ enabled }: { enabled: boolean }) {
           <path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 0 1 0-4.22V7.05H2.18a11 11 0 0 0 0 9.9l3.66-2.84z" />
           <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.05l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" />
         </svg>
-        Continue with Google
+        Sign in with Google
       </a>
-      <div className="mt-5 flex items-center gap-3 text-xs text-muted">
+      <div className="mt-4 flex items-center gap-3 text-xs text-muted">
         <span className="h-px flex-1 bg-line" />
         or
         <span className="h-px flex-1 bg-line" />

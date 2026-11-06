@@ -9,10 +9,15 @@ export function PhoneInput({
   label = "Phone",
   name = "phone",
   defaultValue,
+  required,
+  openUp,
 }: {
   label?: string;
   name?: string;
   defaultValue?: string;
+  required?: boolean;
+  /** Opens the country list above the field, for forms near the bottom of the screen. */
+  openUp?: boolean;
 }) {
   const id = useId();
   const initial = parsePhone(defaultValue);
@@ -69,6 +74,7 @@ export function PhoneInput({
           id={id}
           type="tel"
           inputMode="tel"
+          required={required}
           autoComplete="tel-national"
           value={number}
           onChange={(e) => setNumber(e.target.value.replace(/[^\d\s()-]/g, ""))}
@@ -78,7 +84,7 @@ export function PhoneInput({
       </div>
 
       {open && (
-        <div className="absolute left-0 z-30 mt-1 w-80 max-w-full overflow-hidden rounded-lg border border-line bg-surface shadow-2xl shadow-black/30">
+        <div className={cn("absolute left-0 z-30 w-80 max-w-full overflow-hidden rounded-lg border border-line bg-surface shadow-2xl shadow-black/30", openUp ? "bottom-full mb-1" : "mt-1")}>
           <div className="border-b border-line p-2">
             <input
               autoFocus
@@ -98,7 +104,7 @@ export function PhoneInput({
               className="w-full rounded-md border border-line bg-surface-2 px-2.5 py-1.5 text-sm text-foreground outline-none placeholder:text-muted/60 focus:border-brand"
             />
           </div>
-          <ul role="listbox" aria-label="Country code" className="max-h-60 overflow-y-auto py-1">
+          <ul role="listbox" aria-label="Country code" className={cn("overflow-y-auto overscroll-contain py-1", openUp ? "max-h-44" : "max-h-60")}>
             {matches.length === 0 && <li className="px-3 py-2 text-sm text-muted">No matches</li>}
             {matches.map((c) => (
               <li key={c.iso} role="option" aria-selected={c.iso === iso}>

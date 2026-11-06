@@ -13,7 +13,7 @@ export function GET(request: NextRequest) {
     client_id: process.env.GOOGLE_CLIENT_ID!,
     redirect_uri: redirectUri(request.nextUrl.origin),
     response_type: "code",
-    scope: "openid email profile",
+    scope: "openid email",
     prompt: "select_account",
     state,
     nonce,

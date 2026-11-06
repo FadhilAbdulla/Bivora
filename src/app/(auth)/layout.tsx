@@ -1,13 +1,12 @@
-import { Logo } from "@/components/logo";
-import { MarketOverview, TickerTape } from "@/components/markets/tradingview";
+import Link from "next/link";
+import { Logo, LogoMark } from "@/components/logo";
+import { MarketOverview } from "@/components/markets/tradingview";
 
 export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="border-b border-line bg-surface/40">
-        <TickerTape />
-      </div>
-      <div className="grid flex-1 lg:grid-cols-2">
+    // Pinned to the screen on phones, so the page can't be dragged or bounce. The form is sized to fit.
+    <div className="fixed inset-0 overflow-x-hidden overflow-y-auto overscroll-none lg:static lg:flex lg:flex-1 lg:flex-col lg:overflow-visible">
+      <div className="grid min-h-full grid-cols-1 lg:min-h-0 lg:flex-1 lg:grid-cols-2">
         <aside className="relative hidden overflow-hidden border-r border-line bg-surface/50 lg:block">
           <div className="grid-bg animate-pan absolute inset-0" aria-hidden />
           <div className="animate-drift absolute -left-20 top-0 h-96 w-96 rounded-full bg-brand/15 blur-[100px]" aria-hidden />
@@ -25,11 +24,13 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
             <p className="text-xs text-muted">Trading leveraged products carries a high level of risk.</p>
           </div>
         </aside>
-        <div className="flex items-center justify-center px-4 py-8 sm:px-8 lg:py-10">
+        <div className="flex items-center justify-center px-4 py-3 sm:px-8 lg:py-10">
           <div className="w-full max-w-md">
-            <div className="mb-6 lg:hidden">
-              <Logo large />
-            </div>
+            {/* Smaller on short phones, so the whole form still fits without scrolling. */}
+            <Link href="/" aria-label="Bivora home" className="mb-4 flex items-center gap-2.5 font-semibold tracking-tight lg:hidden">
+              <LogoMark className="size-20 [@media(max-height:740px)]:size-11" />
+              <span className="text-4xl [@media(max-height:740px)]:text-2xl">Bivora</span>
+            </Link>
             {children}
           </div>
         </div>
