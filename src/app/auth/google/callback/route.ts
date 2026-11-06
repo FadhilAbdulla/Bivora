@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { sendLater, sendWelcomeEmail } from "@/lib/email";
 import { GOOGLE_COOKIE, fetchGoogleProfile, isGoogleConfigured, resolveGoogleUser } from "@/lib/google";
 import { createSession } from "@/lib/session";
 
@@ -29,10 +30,11 @@ export async function GET(request: NextRequest) {
     const profile = await fetchGoogleProfile(code, origin, saved.nonce);
     if (!profile) return finish("/login?google=failed");
 
-    const { user, error } = await resolveGoogleUser(profile);
+    const { user, error, created } = await resolveGoogleUser(profile);
     if (!user) return finish(`/login?google=${error}`);
 
     await createSession("client", { userId: user.id });
+    if (created) sendLater("Welcome", () => sendWelcomeEmail(user));
     return finish("/dashboard");
   } catch (e) {
     console.error("Google sign-in failed", e instanceof Error ? e.message : "");

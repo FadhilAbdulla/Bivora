@@ -19,7 +19,7 @@ export default function LoginPage() {
       <Suspense>
         <LoginNotice />
       </Suspense>
-      <GoogleSignIn enabled={isGoogleConfigured()} />
+      <GoogleSignIn enabled={isGoogleConfigured()} label="Sign in with Google" />
       <LoginForm />
       <p className="mt-4 text-sm text-muted sm:mt-6">
         New to Bivora?{" "}

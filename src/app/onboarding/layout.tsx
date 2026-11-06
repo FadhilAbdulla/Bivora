@@ -56,7 +56,7 @@ export default function OnboardingLayout({ children }: LayoutProps<"/onboarding"
                 Bivora
               </span>
               <form action={logout}>
-                <button className="py-1.5 pl-3 text-sm text-muted hover:text-foreground">Log out</button>
+                <button className="-my-1 py-2.5 pl-3 text-sm text-muted hover:text-foreground">Log out</button>
               </form>
             </div>
             <Suspense fallback={<div className="h-7" />}>

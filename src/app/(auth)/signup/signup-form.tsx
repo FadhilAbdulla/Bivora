@@ -11,7 +11,7 @@ export function SignupForm() {
   const v = state?.values ?? {};
 
   return (
-    <form action={action} className="mt-3 space-y-2.5 sm:mt-6 sm:space-y-4">
+    <form action={action} className="mt-3 space-y-2.5 sm:mt-6 sm:space-y-4 [@media(max-height:600px)]:mt-2 [@media(max-height:600px)]:space-y-1">
       {state?.error && <Alert tone="error">{state.error}</Alert>}
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
         <Field label="First name">

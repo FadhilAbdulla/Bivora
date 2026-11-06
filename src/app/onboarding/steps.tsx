@@ -13,6 +13,8 @@ const STEPS = [
 /** Lives in the layout, so the bars animate as the client moves between steps. */
 export function Steps() {
   const pathname = usePathname();
+  // The phone number comes before the four document steps.
+  if (pathname === "/onboarding/phone") return null;
   const current = Math.max(STEPS.findIndex((s) => s.href === pathname), 0) + 1;
 
   return (

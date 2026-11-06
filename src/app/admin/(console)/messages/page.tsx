@@ -24,10 +24,10 @@ export default async function MessagesPage() {
                   <p className="font-medium">{m.name}</p>
                   <p className="text-xs text-muted">{formatDate(m.createdAt)}</p>
                 </div>
-                <a href={`mailto:${m.email}`} className="text-xs font-medium text-brand hover:underline">
+                <a href={`mailto:${m.email}`} className="block text-xs font-medium text-brand [overflow-wrap:anywhere] hover:underline">
                   {m.email}
                 </a>
-                <p className="mt-2 whitespace-pre-wrap break-words text-muted">{m.message}</p>
+                <p className="mt-2 whitespace-pre-wrap text-muted [overflow-wrap:anywhere]">{m.message}</p>
               </li>
             ))}
           </ul>

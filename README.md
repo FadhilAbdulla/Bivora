@@ -1,7 +1,7 @@
 # Bivora
 
 Client portal for Bivora: marketing website with live market data, client sign-up/login,
-a funds dashboard (deposits, withdrawals, transactions, markets, trading account) and a
+a funds dashboard (deposits, withdrawals, transactions, trading account) and a
 separate super admin console for reviewing fund requests. Trading itself happens on ARK trader.
 
 Built with Next.js 16 (App Router, Cache Components), Tailwind CSS 4, Prisma 6 and PostgreSQL.
@@ -29,7 +29,6 @@ Open http://localhost:3000. Clients use `/login`; the super admin signs in at `/
 | `/terms` | public | Terms & Conditions |
 | `/about`, `/contact` | public | About us; contact form that saves to Admin → Messages |
 | `/dashboard` | client | Balances, pending requests, recent activity |
-| `/dashboard/markets` | client | Live charts and quotes |
 | `/dashboard/deposit` | client | Submit / cancel deposit requests |
 | `/dashboard/withdraw` | client | Submit / cancel withdrawal requests |
 | `/dashboard/transactions` | client | Balance ledger and request history |
@@ -71,10 +70,8 @@ everywhere come from `src/lib/markets.ts`; align them with the symbols actually 
 All live prices use TradingView's free embeddable widgets (`src/components/markets/tradingview.tsx`):
 
 - Hero terminal: live price and candles for gold, S&P 500, Nasdaq 100 and Brent.
-- Ticker tape: below the hero on the website (pins under the header while scrolling) and pinned
-  to the bottom of the client dashboard.
+- Ticker tape: below the hero on the website (pins under the header while scrolling).
 - Price lists: the homepage markets section, the login/signup panel and the dashboard overview.
-- Dashboard → Markets: full chart with an instrument picker.
 
 Use TradingView's CFD-style symbols (e.g. `TVC:USOIL`, `OANDA:XCUUSD`); exchange futures such as
 `NYMEX:CL1!` are not available in the free widgets. Keep the "Market data by TradingView" attribution.
@@ -110,8 +107,9 @@ Emails go through Resend (`src/lib/email.ts`): welcome, password reset and tradi
 `RESEND_API_KEY` and `EMAIL_FROM`. Without them nothing sends, and forgot password says it's unavailable.
 
 Google login needs `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, from an OAuth client in Google Cloud with
-`<site>/auth/google/callback` as a redirect URI. The button stays hidden without them. Google is for signing in
-only: new accounts open through signup, which requires a phone number.
+`<site>/auth/google/callback` as a redirect URI. The button stays hidden without them. New Google accounts add a mobile
+number at `/onboarding/phone` before the document steps. An account with no saved password can set one
+through forgot password.
 
 ## How funds work
 

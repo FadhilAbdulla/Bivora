@@ -1,13 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { Alert } from "@/components/ui";
-import { requireOnboardingUser } from "@/lib/auth";
+import { requireDocumentsUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { KYC_DOCS, canEditKyc, isDocComplete } from "@/lib/kyc";
 import { DocumentStep } from "../documents-form";
 
 export default async function DocumentStepPage({ params }: PageProps<"/onboarding/[step]">) {
   // Checked first, so a client who has already submitted always lands in the dashboard, even from an old link.
-  const user = await requireOnboardingUser();
+  const user = await requireDocumentsUser();
   if (!canEditKyc(user.kycStatus)) redirect("/dashboard");
 
   const { step } = await params;

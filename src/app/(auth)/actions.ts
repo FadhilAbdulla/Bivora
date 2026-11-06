@@ -3,11 +3,10 @@
 import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { after } from "next/server";
 import { z } from "zod";
 import { siteUrl } from "@/lib/brand";
 import { db } from "@/lib/db";
-import { missingEmailSettings, sendPasswordResetEmail, sendWelcomeEmail } from "@/lib/email";
+import { missingEmailSettings, sendLater, sendPasswordResetEmail, sendWelcomeEmail } from "@/lib/email";
 import { RESET_COOLDOWN_MS, matchesPassword, readResetToken, signResetToken } from "@/lib/password-reset";
 import { createSession, deleteSession } from "@/lib/session";
 import { formValues, type FormState } from "@/lib/form";
@@ -17,14 +16,6 @@ const newPassword = z
   .min(8, "Password must be at least 8 characters.")
   .regex(/[A-Za-z]/, "Password must contain a letter.")
   .regex(/[0-9]/, "Password must contain a number.");
-
-/** Runs after the response, so a slow or failing email never holds up the client. */
-function sendLater(label: string, send: () => Promise<void>) {
-  if (missingEmailSettings().length) return;
-  after(() =>
-    send().catch((e) => console.error(`${label} email failed`, e instanceof Error ? e.message : "")),
-  );
-}
 
 const signupSchema = z.object({
   firstName: z.string().trim().min(1, "Enter your first name.").max(60),

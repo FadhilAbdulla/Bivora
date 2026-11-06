@@ -60,7 +60,7 @@ export default function MarketingLayout({ children, hero }: { children: ReactNod
                 Log in
               </ButtonLink>
             </div>
-            <ButtonLink href="/signup">Open account</ButtonLink>
+            <ButtonLink href="/signup" className="max-[359px]:px-2.5">Open account</ButtonLink>
           </div>
         </div>
       </header>

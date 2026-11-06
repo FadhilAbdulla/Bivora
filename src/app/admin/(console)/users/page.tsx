@@ -65,8 +65,8 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
             )}
           </EmptyState>
         ) : (
-          <>
-          <ul className="divide-y divide-line md:hidden">
+          <div className="@container">
+          <ul className="divide-y divide-line @3xl:hidden">
             {users.map((u) => (
               <li key={u.id} className="py-3.5">
                 <Link href={`/admin/users/${u.id}`} className="flex items-center justify-between gap-3 px-4 text-sm">
@@ -92,7 +92,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
               </li>
             ))}
           </ul>
-          <div className="hidden md:block">
+          <div className="hidden @3xl:block">
           <Table>
             <thead>
               <tr>
@@ -113,7 +113,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                     <Link href={`/admin/users/${u.id}`} className="font-medium hover:text-brand">
                       {u.firstName} {u.lastName}
                     </Link>
-                    <p className="text-xs text-muted">{u.email}</p>
+                    <p className="text-xs text-muted [overflow-wrap:anywhere]">{u.email}</p>
                   </td>
                   <td className="text-muted">{u.country ?? "—"}</td>
                   <td className="whitespace-nowrap text-muted">{formatDate(u.createdAt)}</td>
@@ -129,7 +129,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
             </tbody>
           </Table>
           </div>
-          </>
+          </div>
         )}
       </Card>
     </>

@@ -3,7 +3,6 @@ import { Suspense, type ReactNode } from "react";
 import { getCurrentUser } from "@/lib/auth";
 import { KycBanner } from "./kyc-banner";
 import { Logo } from "./logo";
-import { TickerTape } from "./markets/tradingview";
 import { MobileNav } from "./mobile-nav";
 import { NavLinkList, NavLinks, type NavItem } from "./nav-links";
 import { Toaster } from "./toast";
@@ -15,7 +14,7 @@ function SidebarContent({ nav }: { nav: NavItem[] }) {
       <div className="flex h-16 shrink-0 items-center px-5">
         <Logo href="/dashboard" />
       </div>
-      <nav className="flex flex-1 flex-col gap-1 px-3 pb-3">
+      <nav className="flex flex-1 flex-col gap-1 px-3 pb-3 pt-5">
         <Suspense fallback={<NavLinkList items={nav} />}>
           <NavLinks items={nav} />
         </Suspense>
@@ -53,10 +52,6 @@ export function AppShell({ nav, children }: { nav: NavItem[]; children: ReactNod
           </Suspense>
           {children}
         </main>
-        {/* Live prices pinned to the bottom of the viewport, like a terminal status bar. */}
-        <div className="sticky bottom-0 z-30 border-t border-line bg-background/85 backdrop-blur-xl">
-          <TickerTape />
-        </div>
         <Toaster />
       </div>
     </div>

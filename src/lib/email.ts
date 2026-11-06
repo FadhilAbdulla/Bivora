@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { siteUrl } from "./brand";
 
 // Transactional email through Resend. Swapping providers only means changing sendEmail().
@@ -9,6 +10,14 @@ const RISK = "Trading involves risk. Only trade with money you can afford to los
 
 export function missingEmailSettings() {
   return REQUIRED_ENV.filter((key) => !process.env[key]);
+}
+
+/** Runs after the response, so a slow or failing email never holds up the client. */
+export function sendLater(label: string, send: () => Promise<void>) {
+  if (missingEmailSettings().length) return;
+  after(() =>
+    send().catch((e) => console.error(`${label} email failed`, e instanceof Error ? e.message : "")),
+  );
 }
 
 async function sendEmail(message: { to: string; subject: string; html: string; text: string }) {

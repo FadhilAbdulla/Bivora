@@ -48,11 +48,11 @@ export function CardHeader({
 }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
-      <div>
+      <div className="min-w-0">
         <h2 className="font-medium">{title}</h2>
         {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
       </div>
-      {action && <div className="shrink-0 whitespace-nowrap">{action}</div>}
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }
@@ -68,7 +68,7 @@ export function PageHeader({
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
+      <div className="min-w-0 [overflow-wrap:anywhere]">
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {description && <p className="mt-1 text-sm text-muted">{description}</p>}
       </div>
@@ -89,11 +89,11 @@ export function StatCard({
   tone?: "brand" | "up" | "warning";
 }) {
   return (
-    <Card className="p-5">
+    <Card className="@container p-5">
       <p className="text-sm text-muted">{label}</p>
       <p
         className={cn(
-          "mt-2 font-mono text-2xl font-semibold tabular-nums",
+          "mt-2 font-mono text-[clamp(1rem,11cqw,1.5rem)] font-semibold tabular-nums [overflow-wrap:anywhere]",
           tone === "brand" && "text-brand",
           tone === "up" && "text-up",
           tone === "warning" && "text-warning",
@@ -120,7 +120,7 @@ export function Field({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium">{label}</span>
+      <span className="block text-sm font-medium">{label}</span>
       {children}
       {hint && <span className="block text-xs text-muted">{hint}</span>}
     </label>

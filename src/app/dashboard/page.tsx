@@ -95,15 +95,7 @@ export default async function DashboardPage() {
           <FundRequestTable requests={recent} compact emptyText="No deposits or withdrawals yet." />
         </Card>
         <Card className="self-start overflow-hidden">
-          <CardHeader
-            title="Markets"
-            action={
-              <ButtonLink href="/dashboard/markets" variant="ghost">
-                Charts
-              </ButtonLink>
-            }
-          />
-          <MarketOverview className="h-[420px] px-1" />
+          <CardHeader title="Markets" />          <MarketOverview className="h-[420px] px-1" />
         </Card>
       </div>
     </>

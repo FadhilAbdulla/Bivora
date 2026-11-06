@@ -6,7 +6,6 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 const nav: NavItem[] = [
   { href: "/dashboard", label: "Overview", icon: "M3 12l9-9 9 9M5 10v10h14V10", exact: true },
-  { href: "/dashboard/markets", label: "Markets", icon: "M3 3v18h18M7 14l3-3 3 3 5-6" },
   { href: "/dashboard/trading", label: "Trading account", icon: "M4 19V9M10 19V5M16 19v-7M22 19H2" },
   { href: "/dashboard/deposit", label: "Deposit", icon: "M12 5v14M5 12l7 7 7-7" },
   { href: "/dashboard/withdraw", label: "Withdraw", icon: "M12 19V5M5 12l7-7 7 7" },

@@ -24,12 +24,12 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
             <p className="text-xs text-muted">Trading leveraged products carries a high level of risk.</p>
           </div>
         </aside>
-        <div className="flex items-center justify-center px-4 py-3 sm:px-8 lg:py-10">
+        <div className="flex items-center justify-center px-4 py-3 sm:px-8 lg:py-10 [@media(max-height:600px)]:py-1">
           <div className="w-full max-w-md">
             {/* Smaller on short phones, so the whole form still fits without scrolling. */}
-            <Link href="/" aria-label="Bivora home" className="mb-4 flex items-center gap-2.5 font-semibold tracking-tight lg:hidden">
-              <LogoMark className="size-20 [@media(max-height:740px)]:size-11" />
-              <span className="text-4xl [@media(max-height:740px)]:text-2xl">Bivora</span>
+            <Link href="/" aria-label="Bivora home" className="mb-4 flex items-center gap-2.5 font-semibold tracking-tight lg:hidden [@media(max-height:600px)]:mb-2">
+              <LogoMark className="size-20 [@media(max-height:740px)]:size-11 [@media(max-height:600px)]:size-8" />
+              <span className="text-4xl [@media(max-height:740px)]:text-2xl [@media(max-height:600px)]:text-xl">Bivora</span>
             </Link>
             {children}
           </div>

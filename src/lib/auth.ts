@@ -36,6 +36,13 @@ export function requireOnboardingUser() {
   return requireFor("client", "/login");
 }
 
+/** A signed-in client ready for the document steps. Clients who signed up with Google add their phone number first. */
+export async function requireDocumentsUser() {
+  const user = await requireFor("client", "/login");
+  if (!user.phone) redirect("/onboarding/phone");
+  return user;
+}
+
 /** A signed-in client who has submitted their documents. Everyone else, including rejected clients, must finish onboarding. */
 export async function requireUser() {
   const user = await requireFor("client", "/login");

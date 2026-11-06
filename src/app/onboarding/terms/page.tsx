@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import { TermsContent } from "@/components/terms-content";
-import { requireOnboardingUser } from "@/lib/auth";
+import { requireDocumentsUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canEditKyc, isKycComplete } from "@/lib/kyc";
 import { TermsForm } from "./terms-form";
 
 export default async function OnboardingTermsPage() {
-  const user = await requireOnboardingUser();
+  const user = await requireDocumentsUser();
   if (!canEditKyc(user.kycStatus)) redirect("/dashboard");
   const documents = await db.kycDocument.findMany({ where: { userId: user.id }, select: { type: true, slot: true, mimeType: true } });
   if (!isKycComplete(documents)) redirect("/onboarding");

@@ -2,9 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireOnboardingUser } from "@/lib/auth";
+import { requireDocumentsUser, requireOnboardingUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import type { FormState } from "@/lib/form";
+import { formValues, type FormState } from "@/lib/form";
 import { canEditKyc, isKycComplete } from "@/lib/kyc";
 import { TERMS_VERSION } from "@/lib/terms";
 
@@ -13,8 +13,19 @@ const schema = z.object({
   risk: z.literal("on", { error: "Please confirm that you understand the risks." }),
 });
 
-export async function acceptTerms(_prev: FormState, formData: FormData): Promise<FormState> {
+const phoneSchema = z.string().trim().regex(/^\+[1-9]\d{6,14}$/, "Enter a valid mobile number.");
+
+export async function savePhone(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await requireOnboardingUser();
+  const parsed = phoneSchema.safeParse(formData.get("phone"));
+  if (!parsed.success) return { error: parsed.error.issues[0].message, values: formValues(formData) };
+
+  await db.user.update({ where: { id: user.id }, data: { phone: parsed.data } });
+  redirect("/onboarding");
+}
+
+export async function acceptTerms(_prev: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireDocumentsUser();
   if (!canEditKyc(user.kycStatus)) redirect("/dashboard");
 
   const parsed = schema.safeParse(Object.fromEntries(formData));

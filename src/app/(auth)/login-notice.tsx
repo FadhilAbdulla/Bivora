@@ -4,7 +4,6 @@ import { useSearchParams } from "next/navigation";
 import { Alert } from "@/components/ui";
 
 const GOOGLE_ERRORS: Record<string, string> = {
-  "no-account": "There's no Bivora account for that Google email. Please open an account first.",
   failed: "We couldn't sign you in with Google. Please try again, or use your email and password.",
   suspended: "Your account is suspended. Please contact support.",
 };

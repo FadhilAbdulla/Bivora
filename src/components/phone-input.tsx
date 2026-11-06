@@ -27,10 +27,13 @@ export function PhoneInput({
   const [query, setQuery] = useState("");
   const root = useRef<HTMLDivElement>(null);
   const numberInput = useRef<HTMLInputElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const country = countryByIso(iso);
 
   useEffect(() => {
     if (!open) return;
+    // Inside a pop-up the list can open below the visible area.
+    panel.current?.scrollIntoView({ block: "nearest" });
     const onPointerDown = (e: PointerEvent) => {
       if (!root.current?.contains(e.target as Node)) setOpen(false);
     };
@@ -84,7 +87,7 @@ export function PhoneInput({
       </div>
 
       {open && (
-        <div className={cn("absolute left-0 z-30 w-80 max-w-full overflow-hidden rounded-lg border border-line bg-surface shadow-2xl shadow-black/30", openUp ? "bottom-full mb-1" : "mt-1")}>
+        <div ref={panel} className={cn("absolute left-0 z-30 w-80 max-w-full overflow-hidden rounded-lg border border-line bg-surface shadow-2xl shadow-black/30", openUp ? "bottom-full mb-1" : "mt-1")}>
           <div className="border-b border-line p-2">
             <input
               autoFocus

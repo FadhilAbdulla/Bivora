@@ -22,15 +22,15 @@ export function FundRequestTable({
   if (requests.length === 0) return <EmptyState title={emptyText} />;
 
   return (
-    <>
-      {/* Phones: one card per request */}
-      <ul className="divide-y divide-line md:hidden">
+    <div className="@container">
+      {/* One card per request wherever a table wouldn't fit, including narrow columns on large screens. */}
+      <ul className={cn("divide-y divide-line", actions ? "@min-[1080px]:hidden" : "@3xl:hidden")}>
         {requests.map((r) => {
           const action = actions?.(r);
           return (
             <li key={r.id} className="space-y-2 px-4 py-4 text-sm">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium capitalize">{r.type.toLowerCase()}</p>
                   <p className="text-xs text-muted">{formatDate(r.createdAt)}</p>
                 </div>
@@ -43,14 +43,14 @@ export function FundRequestTable({
                 </div>
               </div>
               {showUser && r.user && (
-                <p>
+                <p className="[overflow-wrap:anywhere]">
                   {r.user.firstName} {r.user.lastName} <span className="text-xs text-muted">· {r.user.email}</span>
                 </p>
               )}
               <p className="text-muted">
                 {METHOD_LABELS[r.method] ?? r.method}
                 {(r.reference || r.payoutDetails) && (
-                  <span className="block break-words text-xs">{r.reference ?? r.payoutDetails}</span>
+                  <span className="block text-xs [overflow-wrap:anywhere]">{r.reference ?? r.payoutDetails}</span>
                 )}
               </p>
               {r.adminNote && <p className="text-xs text-muted">Note: {r.adminNote}</p>}
@@ -60,7 +60,7 @@ export function FundRequestTable({
         })}
       </ul>
 
-      <div className="hidden md:block">
+      <div className={cn("hidden", actions ? "@min-[1080px]:block" : "@3xl:block")}>
     <Table>
       <thead>
         <tr>
@@ -82,7 +82,7 @@ export function FundRequestTable({
             {showUser && r.user && (
               <td>
                 <p>{r.user.firstName} {r.user.lastName}</p>
-                <p className="text-xs text-muted">{r.user.email}</p>
+                <p className="text-xs text-muted [overflow-wrap:anywhere]">{r.user.email}</p>
               </td>
             )}
             {compact ? null : (
@@ -114,6 +114,6 @@ export function FundRequestTable({
       </tbody>
     </Table>
       </div>
-    </>
+    </div>
   );
 }
