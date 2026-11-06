@@ -1,8 +1,8 @@
 // Draft terms shown during onboarding and at /terms. Have them reviewed by a lawyer before launch,
 // and raise TERMS_VERSION whenever they change.
-export const TERMS_VERSION = "2026-11";
+export const TERMS_VERSION = "2026-11-2";
 
-export const TERMS: { title: string; body: string }[] = [
+export const TERMS: { title: string; body: string; points?: string[] }[] = [
   {
     title: "1. Your account",
     body: "You must be at least 18 years old and legally able to enter this agreement. You agree to provide accurate information and to keep your login details private. You are responsible for all activity on your account.",
@@ -13,7 +13,14 @@ export const TERMS: { title: string; body: string }[] = [
   },
   {
     title: "3. Risk of trading",
-    body: "Trading stocks, indices, commodities and metals on margin carries a high level of risk and may not be suitable for everyone. Prices can move quickly against you and you could lose more than your initial deposit. Past performance does not guarantee future results, and nothing on this platform is investment advice.",
+    body: "Trading stocks, indices, commodities and metals on margin carries a high level of risk and may not be suitable for everyone. By opening an account, you understand that:",
+    points: [
+      "Trading involves risk. Only trade with money you can afford to lose.",
+      "Prices can move quickly against you, and you could lose more than your initial deposit.",
+      "Trading on margin increases both your potential gains and your potential losses.",
+      "Past performance does not guarantee future results.",
+      "Nothing on this platform is investment advice. You are responsible for your own trading decisions.",
+    ],
   },
   {
     title: "4. Deposits and withdrawals",
