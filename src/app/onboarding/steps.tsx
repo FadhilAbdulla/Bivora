@@ -13,6 +13,7 @@ const STEPS = [
 /** Lives in the layout, so the bars animate as the client moves between steps. */
 export function Steps() {
   const pathname = usePathname();
+  if (pathname === "/onboarding/review") return null;
   const current = Math.max(STEPS.findIndex((s) => s.href === pathname), 0) + 1;
 
   return (

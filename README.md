@@ -90,8 +90,10 @@ Onboarding is mandatory for every client account and can't be skipped: a non-clo
 background, repeated after a rejection. Super admins review documents from the client page.
 
 - Four steps, one per screen: passport, Emirates ID, proof of address, terms.
-- Passport: front, optional back. Emirates ID: front and back. Proof of address: one page. A PDF under
+- Passport: front and back. Emirates ID: front and back. Proof of address: one page. A PDF under
   Front counts as both sides. Each can also be captured with the camera.
+- The whole dashboard stays locked until a super admin approves the documents. Clients wait on a review
+  screen, and fund requests can't be approved for an unverified client.
 - JPG, PNG, WebP or PDF up to 10 MB, checked from the file's contents.
 - Files are stored outside `public/` (`KYC_STORAGE_DIR`, default `storage/kyc`, ignored by git) and served
   only through `/api/kyc/[id]` to the owner or a super admin.

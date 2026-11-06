@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { getCurrentUser } from "@/lib/auth";
-import { KycBanner } from "./kyc-banner";
 import { Logo } from "./logo";
 import { TickerTape } from "./markets/tradingview";
 import { MobileNav } from "./mobile-nav";
@@ -48,9 +47,6 @@ export function AppShell({ nav, children }: { nav: NavItem[]; children: ReactNod
           </div>
         </header>
         <main className="flex-1 px-4 py-6 sm:px-8 sm:py-8">
-          <Suspense>
-            <KycBanner />
-          </Suspense>
           {children}
         </main>
         {/* Live prices pinned to the bottom of the viewport, like a terminal status bar. */}

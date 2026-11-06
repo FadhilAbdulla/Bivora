@@ -13,10 +13,10 @@ export const KYC_DOCS: KycDocDef[] = [
     type: "PASSPORT",
     step: "passport",
     title: "Passport",
-    hint: "Take a photo or upload the front page. If your passport is a PDF, upload it once under Front.",
+    hint: "Add the front and back of your passport. If you have one PDF with both, upload it under Front.",
     slots: [
       { slot: "FRONT", label: "Front", required: true },
-      { slot: "BACK", label: "Back (optional)", required: false, imagesOnly: true },
+      { slot: "BACK", label: "Back", required: true, imagesOnly: true },
     ],
   },
   {
@@ -61,6 +61,11 @@ export function isKycComplete(docs: DocRef[]) {
 /** Documents can only change before submission, or after a rejection. */
 export function canEditKyc(status: string) {
   return status === "NOT_SUBMITTED" || status === "REJECTED";
+}
+
+/** Nothing can be done on an account until its documents have been approved. */
+export function isKycApproved(status: string) {
+  return status === "APPROVED";
 }
 
 export function kycTitle(type: string) {

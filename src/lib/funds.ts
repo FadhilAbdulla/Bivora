@@ -2,6 +2,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { applyBalanceOperation, isArkConnected } from "./ark";
+import { isKycApproved } from "./kyc";
 
 export class FundError extends Error {}
 
@@ -74,6 +75,9 @@ export async function approveFundRequest(
     });
     if (!request || request.status !== "PENDING") {
       throw new FundError("This request has already been reviewed.");
+    }
+    if (!isKycApproved(request.user.kycStatus)) {
+      throw new FundError("Approve this client's documents first.");
     }
 
     const isDeposit = request.type === "DEPOSIT";

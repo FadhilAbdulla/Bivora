@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { MarketsWorkspace } from "@/components/markets/markets-workspace";
 import { PageHeader } from "@/components/ui";
+import { requireUser } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Markets" };
 
-export default function DashboardMarketsPage() {
+export default async function DashboardMarketsPage() {
+  await requireUser();
+
   return (
     <>
       <PageHeader
