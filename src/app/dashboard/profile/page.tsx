@@ -71,18 +71,22 @@ export default async function ProfilePage() {
             </Row>
             <Row label="Member since">{formatDate(user.createdAt)}</Row>
             <Row label="Base currency">{user.currency}</Row>
-            <Row label="Trading account">{user.arkAccountId ?? <span className="text-warning">Pending</span>}</Row>
+            <Row label="Trading username">{user.arkUsername ?? <span className="text-warning">Pending</span>}</Row>
           </dl>
         </Card>
       </div>
       <div className="mt-4 space-y-4 sm:mt-6 sm:space-y-6">
         <BankAccounts accounts={bankAccounts} />
         <Card>
-          <CardHeader
-            title="Password"
-            description="Choose a strong password you don't use anywhere else."
-            action={<ChangePasswordButton />}
-          />
+          {user.passwordHash ? (
+            <CardHeader
+              title="Password"
+              description="Choose a strong password you don't use anywhere else."
+              action={<ChangePasswordButton />}
+            />
+          ) : (
+            <CardHeader title="Sign-in" description="You sign in with your Google account." />
+          )}
         </Card>
       </div>
     </>

@@ -163,6 +163,7 @@ export function Alert({
 
 const statusStyles: Record<string, string> = {
   PENDING: "bg-warning/15 text-warning",
+  APPROVING: "bg-warning/15 text-warning",
   APPROVED: "bg-up/15 text-up",
   ACTIVE: "bg-up/15 text-up",
   REJECTED: "bg-down/15 text-down",
@@ -170,7 +171,7 @@ const statusStyles: Record<string, string> = {
   CANCELLED: "bg-line text-muted",
 };
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status, label }: { status: string; label?: string }) {
   return (
     <span
       className={cn(
@@ -178,7 +179,7 @@ export function StatusBadge({ status }: { status: string }) {
         statusStyles[status] ?? "bg-line text-muted",
       )}
     >
-      {status.toLowerCase().replace("_", " ")}
+      {label ?? status.toLowerCase().replace("_", " ")}
     </span>
   );
 }

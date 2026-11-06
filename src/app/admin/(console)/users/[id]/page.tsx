@@ -6,10 +6,10 @@ import { Button, Card, CardHeader, EmptyState, PageHeader, StatCard, StatusBadge
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getAvailableBalance } from "@/lib/funds";
-import { kycTitle } from "@/lib/kyc";
+import { KYC_DOCS, isDocComplete, isKycInReview, kycStage, kycTitle } from "@/lib/kyc";
 import { formatDate, formatMoney } from "@/lib/money";
 import { setUserStatus } from "../../actions";
-import { KycReview } from "../../kyc-review";
+import { KycReview, ResendCredentials } from "../../kyc-review";
 import { ReviewActions } from "../../review-actions";
 import { AdjustBalanceForm } from "./adjust-balance-form";
 
@@ -68,8 +68,19 @@ export default async function UserDetailPage({ params }: PageProps<"/admin/users
         <CardHeader
           title="Identity verification"
           description={user.termsAcceptedAt ? `Terms accepted ${formatDate(user.termsAcceptedAt)}` : "Terms not accepted yet"}
-          action={<StatusBadge status={user.kycStatus} />}
+          action={<StatusBadge status={user.kycStatus} label={kycStage(user.kycStatus, documents)} />}
         />
+        <ol className="grid grid-cols-2 gap-x-4 gap-y-2 border-b border-line px-4 py-3 text-sm sm:grid-cols-4 sm:px-5">
+          {[
+            ...KYC_DOCS.map((def) => ({ label: def.title, done: isDocComplete(def, documents) })),
+            { label: "Terms accepted", done: Boolean(user.termsAcceptedAt) && user.kycStatus !== "NOT_SUBMITTED" },
+          ].map(({ label, done }) => (
+            <li key={label} className={done ? "text-up" : "text-muted"}>
+              <span aria-hidden>{done ? "✓" : "○"}</span> {label}
+              <span className="sr-only">{done ? " complete" : " not complete"}</span>
+            </li>
+          ))}
+        </ol>
         {user.kycNote && <p className="border-b border-line px-5 py-3 text-sm text-muted">Note: {user.kycNote}</p>}
         {documents.length === 0 ? (
           <EmptyState title="No documents uploaded yet." />
@@ -91,8 +102,32 @@ export default async function UserDetailPage({ params }: PageProps<"/admin/users
             ))}
           </ul>
         )}
-        {user.kycStatus === "PENDING" && <KycReview userId={user.id} />}
+        {isKycInReview(user.kycStatus) && <KycReview userId={user.id} />}
       </Card>
+
+      {user.arkUsername && (
+        <Card className="mt-6">
+          <CardHeader
+            title="ARK trading account"
+            description={
+              user.arkCredentialsSentAt
+                ? `Login details emailed ${formatDate(user.arkCredentialsSentAt)}`
+                : "Login details have not been sent yet"
+            }
+          />
+          <dl className="divide-y divide-line text-sm">
+            <div className="flex justify-between gap-4 px-4 py-3 sm:px-5">
+              <dt className="text-muted">Username</dt>
+              <dd className="font-mono">{user.arkUsername}</dd>
+            </div>
+            <div className="flex justify-between gap-4 px-4 py-3 sm:px-5">
+              <dt className="text-muted">Account</dt>
+              <dd className="font-mono">{user.arkAccountId ?? "—"}</dd>
+            </div>
+          </dl>
+          <ResendCredentials userId={user.id} sent={Boolean(user.arkCredentialsSentAt)} />
+        </Card>
+      )}
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_22rem]">
         <Card className="min-w-0">

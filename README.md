@@ -4,15 +4,15 @@ Client portal for Bivora: marketing website with live market data, client sign-u
 a funds dashboard (deposits, withdrawals, transactions, markets, trading account) and a
 separate super admin console for reviewing fund requests. Trading itself happens on ARK trader.
 
-Built with Next.js 16 (App Router, Cache Components), Tailwind CSS 4, Prisma 6 and SQLite.
+Built with Next.js 16 (App Router, Cache Components), Tailwind CSS 4, Prisma 6 and PostgreSQL.
 
 ## Getting started
 
 ```bash
 npm install
-cp .env.example .env          # then fill in SESSION_SECRET and the super admin credentials
-npm run db:migrate            # creates prisma/dev.db
-npm run db:seed               # creates the super admin from SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD
+cp .env.example .env          # then fill in SESSION_SECRET and the database URLs
+npx prisma migrate deploy     # applies migrations to the database in DATABASE_URL
+npm run admin:create          # asks for an email and password, then creates the super admin in the database
 npm run dev
 ```
 
@@ -94,6 +94,12 @@ background, repeated after a rejection. Super admins review documents from the c
   Front counts as both sides. Each can also be captured with the camera.
 - The whole dashboard stays locked until a super admin approves the documents. Clients wait on a review
   screen, and fund requests can't be approved for an unverified client.
+- Approving creates the client's ARK account and emails their trading login (`src/lib/client-approval.ts`).
+  The password is never stored, so "Resend login details" sets a new one. Approval is refused until the
+  `ARK_*` and email settings are in place.
+
+Google login needs `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, from an OAuth client in Google Cloud with
+`<site>/auth/google/callback` as a redirect URI. The button stays hidden without them.
 - JPG, PNG, WebP or PDF up to 10 MB, checked from the file's contents.
 - Files are stored outside `public/` (`KYC_STORAGE_DIR`, default `storage/kyc`, ignored by git) and served
   only through `/api/kyc/[id]` to the owner or a super admin.
@@ -129,8 +135,7 @@ approval transaction, so a failed ARK call rolls the approval back.
 
 ## Before going live
 
-- Switch the Prisma datasource to PostgreSQL and set `DATABASE_URL`.
-- Use a strong, unique `SESSION_SECRET` and change the super admin password.
+- Use a strong, unique `SESSION_SECRET`.
 - Replace the placeholder payment details in `PAYMENT_INSTRUCTIONS` (`src/lib/constants.ts`).
 - Connect an email service if contact messages should also arrive at support@bivoramarkets.com.
 - Have the draft terms in `src/lib/terms.ts` reviewed by a lawyer.

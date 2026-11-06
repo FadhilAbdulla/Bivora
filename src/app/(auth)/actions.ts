@@ -29,7 +29,6 @@ export async function signup(_prev: FormState, formData: FormData): Promise<Form
   const existing = await db.user.findUnique({ where: { email: data.email } });
   if (existing) return { error: "An account with this email already exists.", values };
 
-  // TODO(ark): create the ARK trading account here and store arkAccountId.
   const user = await db.user.create({
     data: {
       ...data,
@@ -62,7 +61,7 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
   if (!parsed.success) return { error: parsed.error.issues[0].message, values };
 
   const user = await db.user.findUnique({ where: { email: parsed.data.email } });
-  const valid = user && (await bcrypt.compare(parsed.data.password, user.passwordHash));
+  const valid = user?.passwordHash && (await bcrypt.compare(parsed.data.password, user.passwordHash));
   // Super admins sign in through /admin/login only.
   if (!user || !valid || user.role !== "USER") return { error: "Incorrect email or password.", values };
   if (user.status !== "ACTIVE") {

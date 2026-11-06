@@ -2,11 +2,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// SQLite for local development. For production switch provider to "postgresql"
-// and point DATABASE_URL at your Postgres instance.
+// Prisma Postgres on Vercel, shared by production and local development.
+// The app connects through the pool; migrations need the direct connection.
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL_POOLED")
+  directUrl = env("DATABASE_URL")
 }
 
 // role:   USER | SUPER_ADMIN
@@ -14,7 +15,9 @@ datasource db {
 model User {
   id              String    @id @default(cuid())
   email           String    @unique
-  passwordHash    String
+  // Empty for clients who only sign in with Google.
+  passwordHash    String?
+  googleId        String?   @unique
   firstName       String
   lastName        String
   phone           String?
@@ -23,9 +26,13 @@ model User {
   status          String    @default("ACTIVE")
   balance         Decimal   @default(0)
   currency        String    @default("USD")
-  // ARK trader account login, filled in once the ARK integration is live.
+  // ARK trader account, created when a super admin approves the client.
+  // The password is only ever emailed to the client, never stored here.
   arkAccountId    String?
-  // Onboarding. kycStatus: NOT_SUBMITTED | PENDING | APPROVED | REJECTED
+  arkUserId       String?
+  arkUsername     String?
+  arkCredentialsSentAt DateTime?
+  // Onboarding. kycStatus: NOT_SUBMITTED | PENDING | APPROVING | APPROVED | REJECTED
   termsAcceptedAt DateTime?
   termsVersion    String?
   kycStatus       String    @default("NOT_SUBMITTED")

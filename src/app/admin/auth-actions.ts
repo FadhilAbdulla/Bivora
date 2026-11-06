@@ -18,7 +18,7 @@ export async function adminLogin(_prev: FormState, formData: FormData): Promise<
   if (!parsed.success) return { error: parsed.error.issues[0].message, values };
 
   const user = await db.user.findUnique({ where: { email: parsed.data.email } });
-  const valid = user && (await bcrypt.compare(parsed.data.password, user.passwordHash));
+  const valid = user?.passwordHash && (await bcrypt.compare(parsed.data.password, user.passwordHash));
   if (!user || !valid || user.role !== "SUPER_ADMIN" || user.status !== "ACTIVE") {
     return { error: "Invalid administrator credentials.", values };
   }

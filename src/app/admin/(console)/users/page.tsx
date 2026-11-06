@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Card, EmptyState, Input, PageHeader, StatusBadge, Table } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { kycStage } from "@/lib/kyc";
 import { formatDate, formatMoney } from "@/lib/money";
 
 export const metadata: Metadata = { title: "Clients" };
@@ -17,15 +18,18 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
       role: "USER",
       ...(query && {
         OR: [
-          { email: { contains: query } },
-          { firstName: { contains: query } },
-          { lastName: { contains: query } },
+          { email: { contains: query, mode: "insensitive" } },
+          { firstName: { contains: query, mode: "insensitive" } },
+          { lastName: { contains: query, mode: "insensitive" } },
         ],
       }),
     },
     orderBy: { createdAt: "desc" },
     take: 200,
-    include: { _count: { select: { fundRequests: { where: { status: "PENDING" } } } } },
+    include: {
+      _count: { select: { fundRequests: { where: { status: "PENDING" } } } },
+      kycDocuments: { select: { type: true, slot: true, mimeType: true } },
+    },
   });
 
   return (
@@ -58,7 +62,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                       {u._count.fundRequests > 0 && (
                         <span className="text-xs text-warning">{u._count.fundRequests} pending</span>
                       )}
-                      <StatusBadge status={u.kycStatus} />
+                      <StatusBadge status={u.kycStatus} label={kycStage(u.kycStatus, u.kycDocuments)} />
                     </span>
                   </span>
                 </Link>
@@ -74,7 +78,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                 <th>Joined</th>
                 <th className="text-right">Balance</th>
                 <th className="text-right">Pending</th>
-                <th>Verification</th>
+                <th>Stage</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -91,7 +95,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                   <td className="whitespace-nowrap text-muted">{formatDate(u.createdAt)}</td>
                   <td className="text-right font-mono tabular-nums">{formatMoney(u.balance, u.currency)}</td>
                   <td className="text-right">{u._count.fundRequests || "—"}</td>
-                  <td><StatusBadge status={u.kycStatus} /></td>
+                  <td><StatusBadge status={u.kycStatus} label={kycStage(u.kycStatus, u.kycDocuments)} /></td>
                   <td><StatusBadge status={u.status} /></td>
                 </tr>
               ))}

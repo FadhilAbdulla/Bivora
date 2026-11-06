@@ -68,6 +68,21 @@ export function isKycApproved(status: string) {
   return status === "APPROVED";
 }
 
+/** Submitted and waiting on a super admin. APPROVING means the ARK account is being created right now. */
+export function isKycInReview(status: string) {
+  return status === "PENDING" || status === "APPROVING";
+}
+
+/** Where a client has got to, as shown to super admins. */
+export function kycStage(status: string, docs: DocRef[]) {
+  if (status === "APPROVED") return "Approved";
+  if (status === "REJECTED") return "Rejected";
+  if (status === "APPROVING") return "Approving";
+  if (status === "PENDING") return "Ready to approve";
+  const next = KYC_DOCS.find((def) => !isDocComplete(def, docs));
+  return next ? `Needs ${next.title.toLowerCase().replace("emirates id", "Emirates ID")}` : "Needs terms";
+}
+
 export function kycTitle(type: string) {
   return KYC_DOCS.find((d) => d.type === type)?.title ?? type;
 }

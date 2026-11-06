@@ -1,11 +1,11 @@
 import "server-only";
 
-// ARK trader integration — PENDING.
+// ARK balances, positions and money transactions — PENDING.
+// Creating client accounts on approval is live: see ./client.ts.
 //
-// Everything the app needs from ARK goes through this module, so wiring up the
-// real API only means implementing these functions against the ARK endpoints.
-// Until then `isArkConnected()` returns false and the UI shows a pending state.
-// Endpoint reference: docs/ark-api.md
+// Wiring up the rest only means implementing these functions against the ARK
+// endpoints. Until then `isArkConnected()` returns false and the UI shows a
+// pending state. Endpoint reference: docs/ark-api.md
 
 export type ArkAccountSummary = {
   accountId: string;
@@ -43,15 +43,6 @@ export class ArkNotConnectedError extends Error {
 export function isArkConnected() {
   // TODO(ark): return true once the client below is implemented.
   return false;
-}
-
-// TODO(ark): POST /admin/public/api/v2/user (Create Client).
-export async function createTradingAccount(_user: {
-  email: string;
-  firstName: string;
-  lastName: string;
-}): Promise<string> {
-  throw new ArkNotConnectedError();
 }
 
 // TODO(ark): GET /trading/public/api/v2/userFinancials/{userId} (Financial Standing).

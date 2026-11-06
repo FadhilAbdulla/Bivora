@@ -97,7 +97,7 @@ export default async function OpengraphImage() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 20, color: "#93a09b" }}>
             <span style={{ color: "#f1f5f2", fontWeight: 600 }}>XAU/USD</span>
-            <span>Gold · 1D</span>
+            <span>Gold · 5D</span>
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: chartHeight, marginTop: 20, position: "relative" }}>
             {CANDLES.map(([o, c, h, l], i) => {

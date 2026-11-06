@@ -27,7 +27,7 @@ export default async function AdminPage() {
       take: 10,
       include: { user: { select: { email: true, firstName: true, lastName: true } } },
     }),
-    db.user.findMany({ where: { role: "USER", kycStatus: "PENDING" }, orderBy: { kycSubmittedAt: "asc" }, take: 10 }),
+    db.user.findMany({ where: { role: "USER", kycStatus: { in: ["PENDING", "APPROVING"] } }, orderBy: { kycSubmittedAt: "asc" }, take: 10 }),
   ]);
 
   const pendingOf = (type: string) => pending.find((p) => p.type === type);

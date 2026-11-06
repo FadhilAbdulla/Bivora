@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui";
 import { requireOnboardingUser } from "@/lib/auth";
+import { isKycInReview } from "@/lib/kyc";
 
 // Where clients wait after submitting: nothing on the account opens until a super admin approves their documents.
 export default async function ReviewPage() {
   const user = await requireOnboardingUser();
-  if (user.kycStatus !== "PENDING") redirect("/onboarding");
+  if (!isKycInReview(user.kycStatus)) redirect("/onboarding");
 
   return (
     <div role="status" className="step-in pb-8 pt-6 text-center">

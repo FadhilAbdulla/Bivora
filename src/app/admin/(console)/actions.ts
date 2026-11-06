@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
+import { approveClient, resendCredentials } from "@/lib/client-approval";
 import { db } from "@/lib/db";
 import type { FormState } from "@/lib/form";
 import { FundError, adjustBalance, approveFundRequest, rejectFundRequest } from "@/lib/funds";
@@ -84,13 +85,28 @@ export async function reviewKyc(_prev: FormState, formData: FormData): Promise<F
   const parsed = kycSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: "Invalid request." };
   const { userId, decision, note } = parsed.data;
-  if (decision === "REJECTED" && !note) return { error: "Enter a reason so the client knows what to fix." };
 
+  if (decision === "APPROVED") {
+    const { error, warning } = await approveClient(userId);
+    if (error) return { error };
+    refresh();
+    return warning ? { error: warning } : { success: "Approved. Login details sent to the client." };
+  }
+
+  if (!note) return { error: "Enter a reason so the client knows what to fix." };
   const { count } = await db.user.updateMany({
     where: { id: userId, kycStatus: "PENDING" },
-    data: { kycStatus: decision, kycNote: note || null, kycReviewedAt: new Date() },
+    data: { kycStatus: "REJECTED", kycNote: note, kycReviewedAt: new Date() },
   });
   if (count === 0) return { error: "These documents have already been reviewed." };
   refresh();
   return { success: "Saved." };
+}
+
+export async function resendArkCredentials(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireAdmin();
+  const { error, warning } = await resendCredentials(String(formData.get("userId") ?? ""));
+  if (error || warning) return { error: error ?? warning };
+  refresh();
+  return { success: "New login details sent." };
 }

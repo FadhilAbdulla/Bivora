@@ -20,7 +20,8 @@ Responses share the envelope `{ data, message, httpStatus, errorCode, success }`
 
 | Bivora function (`src/lib/ark/index.ts`) | ARK endpoint |
 | --- | --- |
-| `createTradingAccount` | `POST /admin/public/api/v2/user` — Create Client (needs `parentId`, policy IDs, `isDemo`, `email`, `password`, …) |
+| `provisionArkAccount` (`client.ts`) | `POST /admin/public/api/v2/user` — Create Client, then `GET /admin/public/api/v2/username/{username}` for its IDs |
+| `resetArkPassword` (`client.ts`) | `PUT /admin/public/api/v2/user/{userId}` with `{ "password": "…", "forceChangePassword": true }` |
 | `getAccountSummary` | `GET /trading/public/api/v2/userFinancials/{userId}` — Financial Standing |
 | `getOpenPositions` | `GET /trading/public/api/v2/report/open/positions/{userId}/0?fromDate&toDate&limit&offset` (0 = buy+sell) |
 | `getTradeHistory` | `GET /admin/public/api/v2/report/closed/positions/{userId}?fromDate&toDate&limit&offset` |
@@ -50,4 +51,8 @@ Responses share the envelope `{ data, message, httpStatus, errorCode, success }`
   `/trading/public/api/v2/cashRequest`). Bivora keeps requests and approvals in its own database and
   only posts the final money transaction to ARK on approval.
 - To confirm with the broker: company name, dealer credentials, the `parentId` (office) for new
-  clients, and the policy IDs (`genericPolicyID`, `currenciesPolicyID`, …) to assign.
+  clients, the policy IDs (`genericPolicyID`, `currenciesPolicyID`) and `userCurrencyId` to assign, the
+  trading platform's login URL, and any password rules.
+- The docs show no response example for Create Client or Get User By Username. `client.ts` reads
+  `userID` and `accountID`, the names used in ARK's report responses. Check this against a test account
+  before going live.

@@ -134,7 +134,7 @@ export async function changePassword(_prev: FormState, formData: FormData): Prom
   const parsed = passwordSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  if (!(await bcrypt.compare(parsed.data.currentPassword, user.passwordHash))) {
+  if (!user.passwordHash || !(await bcrypt.compare(parsed.data.currentPassword, user.passwordHash))) {
     return { error: "Current password is incorrect." };
   }
   await db.user.update({
