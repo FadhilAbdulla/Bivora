@@ -3,8 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import { getCurrentUser } from "@/lib/auth";
 import { KycBanner } from "./kyc-banner";
 import { Logo } from "./logo";
-import { MobileNav } from "./mobile-nav";
-import { NavLinkList, NavLinks, type NavItem } from "./nav-links";
+import { BottomTabList, BottomTabs, NavLinkList, NavLinks, type NavItem } from "./nav-links";
 import { Toaster } from "./toast";
 import { Skeleton } from "./ui";
 
@@ -27,6 +26,7 @@ function SidebarContent({ nav }: { nav: NavItem[] }) {
 }
 
 export function AppShell({ nav, children }: { nav: NavItem[]; children: ReactNode }) {
+  const tabs = nav.filter((item) => item.tab);
   return (
     <div className="flex flex-1">
       <aside className="hidden border-r border-line bg-surface lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-60 lg:shrink-0 lg:flex-col">
@@ -34,9 +34,6 @@ export function AppShell({ nav, children }: { nav: NavItem[]; children: ReactNod
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-line bg-background/90 px-4 backdrop-blur-xl sm:px-8">
-          <MobileNav>
-            <SidebarContent nav={nav} />
-          </MobileNav>
           <div className="lg:hidden">
             <Logo href="/dashboard" />
           </div>
@@ -46,12 +43,24 @@ export function AppShell({ nav, children }: { nav: NavItem[]; children: ReactNod
             </Suspense>
           </div>
         </header>
-        <main className="flex-1 px-4 py-6 sm:px-8 sm:py-8">
+        <main className="flex-1 px-4 pb-24 pt-6 sm:px-8 sm:pt-8 lg:pb-8">
           <Suspense>
             <KycBanner />
           </Suspense>
           {children}
+          <p className="mt-8 text-xs text-muted lg:hidden">Trading involves risk. Only trade with money you can afford to lose.</p>
         </main>
+        {/* Phones and tablets: app-style tabs. Profile and Log out are behind the avatar in the header. */}
+        <nav
+          aria-label="Main"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+        >
+          <div className="flex h-16">
+            <Suspense fallback={<BottomTabList items={tabs} />}>
+              <BottomTabs items={tabs} />
+            </Suspense>
+          </div>
+        </nav>
         <Toaster />
       </div>
     </div>
