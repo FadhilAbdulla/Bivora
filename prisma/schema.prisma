@@ -150,6 +150,7 @@ model ArkSettings {
   parentId           Int
   genericPolicyId    Int
   currenciesPolicyId Int
+  // Not a setting any more: ARK's userCurrencyId is always 1. Kept so no migration is needed.
   currencyId         Int
   tradingUrl         String
   updatedAt          DateTime @updatedAt

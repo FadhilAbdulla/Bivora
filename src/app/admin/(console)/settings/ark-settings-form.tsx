@@ -14,7 +14,6 @@ export type ArkFormValues = {
   parentId: number;
   genericPolicyId: number;
   currenciesPolicyId: number;
-  currencyId: number;
   tradingUrl: string;
 };
 
@@ -45,8 +44,8 @@ export function ArkSettingsForm({ saved }: { saved: ArkFormValues | null }) {
           <Input name="dealerPassword" type="password" required={!saved} autoComplete="new-password" placeholder={saved ? "••••••••" : undefined} />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Field label="Office ID">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="Office ID" hint="Where new clients are created. See ARK accounts for every office ID.">
           <Input name="parentId" inputMode="numeric" required autoComplete="off" defaultValue={v.parentId} />
         </Field>
         <Field label="Generic policy ID">
@@ -54,9 +53,6 @@ export function ArkSettingsForm({ saved }: { saved: ArkFormValues | null }) {
         </Field>
         <Field label="Script policy ID">
           <Input name="currenciesPolicyId" inputMode="numeric" required autoComplete="off" defaultValue={v.currenciesPolicyId} />
-        </Field>
-        <Field label="Currency ID">
-          <Input name="currencyId" inputMode="numeric" required autoComplete="off" defaultValue={v.currencyId} />
         </Field>
       </div>
       <Field label="Trading login URL" hint="Where clients log in to trade. It goes in their login email.">

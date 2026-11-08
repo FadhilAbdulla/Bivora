@@ -22,7 +22,6 @@ export default async function ArkSettingsPage() {
     parentId: settings.parentId,
     genericPolicyId: settings.genericPolicyId,
     currenciesPolicyId: settings.currenciesPolicyId,
-    currencyId: settings.currencyId,
     tradingUrl: settings.tradingUrl,
   };
 

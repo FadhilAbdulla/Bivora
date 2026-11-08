@@ -39,6 +39,7 @@ Open http://localhost:3000. Clients use `/login`; the super admin signs in at `/
 | `/admin/requests` | super admin | All requests, filter by status/type, approve/reject |
 | `/admin/users` | super admin | Clients, balances, suspend/reactivate, manual adjustments |
 | `/admin/admins` | super admin | Add and deactivate admins, change your own password |
+| `/admin/ark` | super admin | ARK offices with their IDs, client counts and the trading financial report |
 | `/admin/settings` | super admin | ARK connection details and dealer password |
 
 ## Brand

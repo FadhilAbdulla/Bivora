@@ -17,16 +17,27 @@ export type ArkConfig = {
   parentId: number;
   genericPolicyId: number;
   currenciesPolicyId: number;
-  currencyId: number;
   tradingUrl: string;
 };
+
+/** ARK's account currency for every Bivora client. Always 1 on this broker. */
+export const ARK_USER_CURRENCY_ID = 1;
 
 export async function loadArkConfig(): Promise<ArkConfig> {
   const saved = await db.arkSettings.findUnique({ where: { id: "ark" } });
   if (!saved) throw new ArkError("Add the ARK connection details under ARK settings first.");
-  const { dealerPasswordEnc, ...rest } = saved;
+  const { dealerPasswordEnc, apiUrl, companyName, dealerUsername, parentId, genericPolicyId, currenciesPolicyId, tradingUrl } = saved;
   try {
-    return { ...rest, dealerPassword: decryptSecret(dealerPasswordEnc) };
+    return {
+      apiUrl,
+      companyName,
+      dealerUsername,
+      parentId,
+      genericPolicyId,
+      currenciesPolicyId,
+      tradingUrl,
+      dealerPassword: decryptSecret(dealerPasswordEnc),
+    };
   } catch (e) {
     if (e instanceof SecretKeyError) throw new ArkError(e.message);
     throw e;
@@ -35,7 +46,7 @@ export async function loadArkConfig(): Promise<ArkConfig> {
 
 type Envelope<T> = { data?: T; message?: string; success?: boolean };
 
-async function arkFetch<T>(config: ArkConfig, path: string, init: RequestInit & { token?: string }) {
+export async function arkFetch<T>(config: ArkConfig, path: string, init: RequestInit & { token?: string }) {
   const { token, ...rest } = init;
   let response: Response;
   try {
@@ -134,7 +145,7 @@ export async function provisionArkAccount(config: ArkConfig, client: {
       parentId: config.parentId,
       genericPolicyID: config.genericPolicyId,
       currenciesPolicyID: config.currenciesPolicyId,
-      userCurrencyId: config.currencyId,
+      userCurrencyId: ARK_USER_CURRENCY_ID,
       roboDealerPolicyId: -1,
       accountMirroringPolicyId: -1,
       accountMirroringAccountIds: [],

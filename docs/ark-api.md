@@ -28,6 +28,17 @@ Responses share the envelope `{ data, message, httpStatus, errorCode, success }`
 | `applyBalanceOperation` | `POST /admin/public/api/v2/money/transaction` |
 | (lookup) | `GET /admin/public/api/v2/user/{userId}`, `GET /admin/public/api/v2/account/{accountId}` |
 
+### Admin → ARK accounts (`src/lib/ark/reports.ts`)
+
+| What | ARK endpoint |
+| --- | --- |
+| Top node | `GET /admin/public/api/v2/username/{dealerUsername}`, then `GET /admin/public/api/v2/user/{parentId}` up the tree until ARK refuses |
+| Offices / clients | `GET /admin/public/api/v2/report/users/details/{nodeId}?fromDate&toDate&withDemo=true&userTypeId=2` (offices) or `=1` (clients), `limit=500`, pages merged by user ID |
+| Trading financial report | `GET /financialStandings/public/api/v2/userFinancials?userIds={nodeId}&withDemo=false` (an office node returns all its clients) |
+
+`userTypeId`: 1 Client · 2 Office · 3 Dealer · 4 Department. The docs have no response examples for
+these, so the page shows the financial report's columns exactly as ARK returns them.
+
 ### Money transaction
 
 ```json
@@ -52,7 +63,7 @@ Responses share the envelope `{ data, message, httpStatus, errorCode, success }`
   only posts the final money transaction to ARK on approval.
 - These details are entered at `/admin/settings`, not in environment variables.
 - To confirm with the broker: company name, dealer credentials, the `parentId` (office) for new
-  clients, the policy IDs (`genericPolicyID`, `currenciesPolicyID`) and `userCurrencyId` to assign, the
+  clients, the policy IDs (`genericPolicyID`, `currenciesPolicyID`) to assign (`userCurrencyId` is always 1), the
   trading platform's login URL, and any password rules.
 - The docs show no response example for Create Client or Get User By Username. `client.ts` reads
   `userID` and `accountID`, the names used in ARK's report responses. Check this against a test account

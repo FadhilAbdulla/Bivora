@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { ArkError, loadArkConfig, loginDealer } from "@/lib/ark/client";
+import { ARK_USER_CURRENCY_ID, ArkError, loadArkConfig, loginDealer } from "@/lib/ark/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formValues, type FormState } from "@/lib/form";
@@ -20,7 +20,6 @@ const schema = z.object({
   parentId: positiveId("office ID"),
   genericPolicyId: positiveId("generic policy ID"),
   currenciesPolicyId: positiveId("script policy ID"),
-  currencyId: positiveId("currency ID"),
   tradingUrl: httpsUrl("trading login URL"),
 });
 
@@ -31,7 +30,6 @@ const LABELS: Record<string, string> = {
   parentId: "Office ID",
   genericPolicyId: "Generic policy ID",
   currenciesPolicyId: "Script policy ID",
-  currencyId: "Currency ID",
   tradingUrl: "Trading login URL",
 };
 
@@ -65,8 +63,9 @@ export async function saveArkSettings(_prev: FormState, formData: FormData): Pro
   await db.$transaction([
     db.arkSettings.upsert({
       where: { id: "ark" },
-      create: { ...data, dealerPasswordEnc: dealerPasswordEnc! },
-      update: { ...data, dealerPasswordEnc: dealerPasswordEnc! },
+      // Not a setting any more, but the column stays so no migration is needed.
+      create: { ...data, currencyId: ARK_USER_CURRENCY_ID, dealerPasswordEnc: dealerPasswordEnc! },
+      update: { ...data, currencyId: ARK_USER_CURRENCY_ID, dealerPasswordEnc: dealerPasswordEnc! },
     }),
     db.arkSettingsChange.create({ data: { adminEmail: admin.email, fields: changed.join(", ") } }),
   ]);
