@@ -2,7 +2,8 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { ARK_USER_CURRENCY_ID, ArkError, connectArk, findArkOffice, loadArkConfig } from "@/lib/ark/client";
+import { ARK_USER_CURRENCY_ID, ArkError, connectArk, loadArkConfig } from "@/lib/ark/client";
+import { findArkOffice } from "@/lib/ark/reports";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formValues, type FormState } from "@/lib/form";
@@ -98,13 +99,13 @@ export async function saveOfficeFromUsername(_prev: FormState, formData: FormDat
   const username = String(formData.get("officeUsername") ?? "").trim();
   if (!username || username.length > 200) return { error: "Enter the office username." };
   try {
-    const officeId = await findArkOffice(await loadArkConfig(), username);
+    const { officeId, note } = await findArkOffice(username);
     await db.$transaction([
       db.arkSettings.update({ where: { id: "ark" }, data: { parentId: officeId } }),
       db.arkSettingsChange.create({ data: { adminEmail: admin.email, fields: `Office ID (looked up from ${username})` } }),
     ]);
     refresh();
-    return { success: `Office ID set to ${officeId} (${username}).`, values: { officeId: String(officeId) } };
+    return { success: `Office ID set to ${officeId} (${username}).${note}`, values: { officeId: String(officeId) } };
   } catch (e) {
     if (e instanceof ArkError) return { error: e.message };
     throw e;

@@ -297,22 +297,3 @@ export async function provisionArkAccount(config: ArkConfig, client: {
 export async function resetArkPassword(config: ArkConfig, arkUserId: string, password: string) {
   await setPassword(config, arkUserId, password);
 }
-
-/**
- * TEMPORARY: finds an office by its ARK username so its ID can be saved as the office for new
- * clients. Remove with the Find office ID box in ARK settings once the office ID is set.
- */
-export async function findArkOffice(config: ArkConfig, username: string) {
-  const result = await arkRequest<ArkUser & { userType?: number; userTypeId?: number }>(
-    config,
-    `/admin/public/api/v2/username/${encodeURIComponent(username)}`,
-    { method: "GET" },
-  );
-  if (!result.ok || !result.data) throw new ArkError(`ARK has no user called "${username}".`);
-  const { userID, userId, id, userType, userTypeId } = result.data;
-  const officeId = userID ?? userId ?? id;
-  if (officeId == null) throw new ArkError("ARK found the user but didn't return its ID.");
-  const type = userType ?? userTypeId;
-  if (type != null && Number(type) !== 2) throw new ArkError(`"${username}" is not an office in ARK (user type ${type}).`);
-  return Number(officeId);
-}

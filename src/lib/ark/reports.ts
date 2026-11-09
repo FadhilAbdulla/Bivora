@@ -46,7 +46,7 @@ function rowsOf(data: unknown): ArkRow[] {
   if (Array.isArray(data)) return data.filter((r): r is ArkRow => typeof r === "object" && r !== null);
   // Some ARK reports wrap the list.
   if (data && typeof data === "object") {
-    for (const key of ["content", "data", "rows", "list", "items"]) {
+    for (const key of ["content", "data", "rows", "list", "items", "users", "user"]) {
       const inner = (data as ArkRow)[key];
       if (Array.isArray(inner)) return rowsOf(inner);
     }
@@ -152,6 +152,84 @@ export async function getArkOverview(requestedNode?: number): Promise<ArkOvervie
     section(() => financials(config, node)),
   ]);
   return { top, node, nodeInfo, offices, clients, financials: standing };
+}
+
+// ---------- TEMPORARY: find the office ID from its username ----------
+
+const usernameOf = (row: ArkRow) =>
+  [row.username, row.userName, row.login].find((v): v is string => typeof v === "string") ?? "";
+
+/** ARK sends the type as a number, a numeric string or a label. */
+function typeOf(row: ArkRow) {
+  const n = userTypeOf(row);
+  if (n !== undefined) return n;
+  const label = [row.userType, row.userTypeName, row.type].find((v): v is string => typeof v === "string") ?? "";
+  if (/office/i.test(label)) return 2;
+  if (/client/i.test(label)) return 1;
+  if (/dealer/i.test(label)) return 3;
+  if (/department/i.test(label)) return 4;
+  return undefined;
+}
+
+const TYPE_NAMES: Record<number, string> = { 1: "a client", 2: "an office", 3: "a dealer", 4: "a department" };
+
+/**
+ * The office ID for an ARK username. Tries ARK's username lookup, then searches every office under the
+ * dealer's top node (some dealer policies refuse the direct lookup). A dealer or department name resolves
+ * to the office above it.
+ */
+export async function findArkOffice(username: string): Promise<{ officeId: number; note: string }> {
+  const config = await loadArkConfig();
+  await ensureArkSession(config);
+  const wanted = username.trim().toLowerCase();
+  const matches = (row: ArkRow) => usernameOf(row).toLowerCase() === wanted;
+
+  const direct = await arkRequest<unknown>(config, `/admin/public/api/v2/username/${encodeURIComponent(username.trim())}`, { method: "GET" });
+  const directRows = direct.ok ? rowsOf(direct.data).filter((r) => userIdOf(r) !== undefined) : [];
+  let user: ArkRow | undefined = directRows.find(matches) ?? (directRows.length === 1 ? directRows[0] : undefined);
+
+  let searchError = "";
+  if (!user) {
+    try {
+      const top = await findTopNode(config);
+      const offices = await listUsers(config, top, USER_TYPE.office);
+      user = offices.rows.find(matches);
+      // The top node itself may be the office.
+      if (!user) {
+        const self = rowsOf(await get(config, `/admin/public/api/v2/user/${top}`).catch(() => null))[0];
+        if (self && matches(self)) user = self;
+      }
+    } catch (e) {
+      searchError = e instanceof ArkError ? e.message : "the office search failed";
+    }
+  }
+
+  if (!user) {
+    const said = direct.ok ? "" : ` ARK said: "${direct.message || `error ${direct.status}`}".`;
+    throw new ArkError(
+      `No ARK office with the username "${username}" was found.${said}${searchError ? ` Office search: ${searchError}.` : ""} Check the spelling, or ask the broker whether this dealer can see that office.`,
+    );
+  }
+
+  let type = typeOf(user);
+  let id = userIdOf(user)!;
+  if (type === 1) throw new ArkError(`"${username}" is a client account in ARK (user ${id}), not an office.`);
+  let note = "";
+  if (type === 3 || type === 4) {
+    // Walk up to the nearest office.
+    let row: ArkRow | undefined = user;
+    for (let i = 0; i < 10 && row && type !== 2; i++) {
+      const parent = parentIdOf(row);
+      if (!parent || parent <= 0 || parent === id) break;
+      row = rowsOf(await get(config, `/admin/public/api/v2/user/${parent}`).catch(() => null))[0];
+      if (!row) break;
+      id = parent;
+      type = typeOf(row);
+    }
+    if (type !== 2) throw new ArkError(`"${username}" is ${TYPE_NAMES[typeOf(user)!]} in ARK and no office was found above it.`);
+    note = ` "${username}" is ${TYPE_NAMES[typeOf(user)!]}; this is the office it belongs to${row && nameOf(row) ? ` (${nameOf(row)})` : ""}.`;
+  }
+  return { officeId: id, note };
 }
 
 // ---------- Where an account or transaction came from ----------
