@@ -1,23 +1,19 @@
 export const MIN_DEPOSIT = 50;
-export const MIN_WITHDRAWAL = 20;
+/** No minimum: any amount above zero, up to what's available. */
+export const MIN_WITHDRAWAL = 0.01;
 export const MAX_REQUEST_AMOUNT = 1_000_000;
 
-export const DEPOSIT_METHODS = [
-  { value: "BANK_TRANSFER", label: "Bank transfer" },
-  { value: "USDT_TRC20", label: "USDT (TRC20)" },
-  { value: "USDT_ERC20", label: "USDT (ERC20)" },
-  { value: "CARD", label: "Credit / debit card" },
-] as const;
+// Only bank transfer is offered for now. Add a method back here to offer it again.
+export const DEPOSIT_METHODS = [{ value: "BANK_TRANSFER", label: "Bank transfer" }] as const;
+export const WITHDRAWAL_METHODS = [{ value: "BANK_TRANSFER", label: "Bank transfer" }] as const;
 
-export const WITHDRAWAL_METHODS = [
-  { value: "BANK_TRANSFER", label: "Bank transfer" },
-  { value: "USDT_TRC20", label: "USDT (TRC20)" },
-  { value: "USDT_ERC20", label: "USDT (ERC20)" },
-] as const;
-
-export const METHOD_LABELS: Record<string, string> = Object.fromEntries(
-  [...DEPOSIT_METHODS, ...WITHDRAWAL_METHODS].map((m) => [m.value, m.label]),
-);
+/** Labels for every method, including ones no longer offered, so older requests still read well. */
+export const METHOD_LABELS: Record<string, string> = {
+  BANK_TRANSFER: "Bank transfer",
+  USDT_TRC20: "USDT (TRC20)",
+  USDT_ERC20: "USDT (ERC20)",
+  CARD: "Credit / debit card",
+};
 
 // Shown on the deposit page. Replace with your real payment details.
 export const PAYMENT_INSTRUCTIONS: Record<string, string[]> = {

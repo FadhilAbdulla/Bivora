@@ -13,6 +13,8 @@ import { setUserStatus } from "../../actions";
 import { KycReview, ResendCredentials } from "../../kyc-review";
 import { ReviewActions } from "../../review-actions";
 import { AdjustBalanceForm } from "./adjust-balance-form";
+import { AdminDocuments } from "./admin-documents";
+import { DemoSwitch } from "./demo-switch";
 import { ArkMoneySection, ArkMoneySectionLoading } from "./ark-money-section";
 
 export const metadata: Metadata = { title: "Client" };
@@ -84,7 +86,12 @@ export default async function UserDetailPage({ params }: PageProps<"/admin/users
           ))}
         </ol>
         {user.kycNote && <p className="border-b border-line px-5 py-3 text-sm text-muted">Note: {user.kycNote}</p>}
-        {documents.length === 0 ? (
+        {user.kycStatus !== "APPROVED" && user.kycStatus !== "APPROVING" ? (
+          <AdminDocuments
+            userId={user.id}
+            initialDocuments={documents.map((d) => ({ id: d.id, type: d.type, slot: d.slot, fileName: d.fileName, mimeType: d.mimeType, size: d.size }))}
+          />
+        ) : documents.length === 0 ? (
           <EmptyState title="No documents uploaded yet." />
         ) : (
           <ul className="divide-y divide-line text-sm">
@@ -93,7 +100,7 @@ export default async function UserDetailPage({ params }: PageProps<"/admin/users
                 <div className="min-w-0">
                   <p className="font-medium">
                     {kycTitle(d.type)}
-                    {d.slot === "BACK" ? " (back)" : d.slot === "FRONT" ? " (front)" : ""}
+                    {d.slot === "BACK" ? " (back)" : d.slot === "FRONT" ? " (front)" : d.slot === "BOTH" ? " (front and back)" : ""}
                   </p>
                   <p className="truncate text-xs text-muted">{d.fileName}</p>
                 </div>
@@ -125,6 +132,13 @@ export default async function UserDetailPage({ params }: PageProps<"/admin/users
             <div className="flex justify-between gap-4 px-4 py-3 sm:px-5">
               <dt className="text-muted">Account</dt>
               <dd className="font-mono">{user.arkAccountId ?? "—"}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+              <dt className="text-muted">Account type</dt>
+              <dd className="flex items-center gap-3">
+                <span className={user.arkIsDemo ? "font-medium text-warning" : "font-medium"}>{user.arkIsDemo ? "Demo" : "Real"}</span>
+                <DemoSwitch userId={user.id} demo={user.arkIsDemo} />
+              </dd>
             </div>
           </dl>
           <ResendCredentials userId={user.id} sent={Boolean(user.arkCredentialsSentAt)} />

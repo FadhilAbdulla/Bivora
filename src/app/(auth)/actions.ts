@@ -143,7 +143,7 @@ export async function resetPassword(_prev: FormState, formData: FormData): Promi
   // A new session version signs out every device that was logged in.
   const { count } = await db.user.updateMany({
     where: { id: user.id, passwordHash: user.passwordHash },
-    data: { passwordHash: await hashPassword(parsed.data.password), sessionVersion: { increment: 1 } },
+    data: { passwordHash: await hashPassword(parsed.data.password), sessionVersion: { increment: 1 }, arkPasswordEnc: null },
   });
   if (count === 0) return { error: LINK_INVALID };
   await reset("login-email", user.email);

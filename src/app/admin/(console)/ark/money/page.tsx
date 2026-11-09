@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import type { ReactNode } from "react";
-import { Alert, Button, Card, CardHeader, EmptyState, Field, Input, PageHeader, Select, StatCard, buttonClass, cn } from "@/components/ui";
+import { Alert, Button, Card, CardHeader, EmptyState, Field, Input, PageHeader, Select, buttonClass, cn } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { MANUAL_MONEY_TYPES } from "@/lib/ark/client";
 import { STUCK_MS } from "@/lib/ark-money";
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/money";
 import { PendingArea, PendingForm, PendingLink } from "@/components/pending-nav";
-import { MoneyForm, RetryButton } from "./money-form";
+import { AddMoneyButton, RetryButton } from "./money-form";
 import {
   TRANSACTION_TYPES,
   amountOf,
@@ -65,7 +65,9 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
       select: { id: true, firstName: true, lastName: true, email: true, arkUsername: true },
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
     }),
+    // Only the ones that didn't reach ARK: everything else is in ARK's list below.
     db.arkMoneyTransaction.findMany({
+      where: { status: { not: "DONE" } },
       orderBy: { createdAt: "desc" },
       take: 30,
       include: { user: { select: { id: true, firstName: true, lastName: true, currency: true } }, admin: { select: { email: true } } },
@@ -74,23 +76,25 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
 
   const header = (
     <>
-      <PageHeader title="ARK money flow" description="Post credit, adjustments and bonuses to clients, and see every money transaction in ARK." />
-      <div className="mb-6 grid items-start gap-4 sm:gap-6 xl:grid-cols-[minmax(0,26rem)_1fr]">
-        <Card id="new" className="scroll-mt-20">
-          <CardHeader title="New transaction" description="Goes straight to the client's ARK account, and the client is emailed. It doesn't change their Bivora wallet." />
-          <MoneyForm
+      <PageHeader
+        title="ARK money flow"
+        description="Every money transaction on ARK, made in Bivora or in ARK directly."
+        action={
+          <AddMoneyButton
             key={forClient ?? ""}
             defaultClient={arkClients.some((c) => c.id === forClient) ? forClient : undefined}
             firstKey={randomUUID().replace(/-/g, "")}
             types={MANUAL_MONEY_TYPES}
             clients={arkClients.map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`, detail: [c.arkUsername, c.email].filter(Boolean).join(" · ") }))}
           />
-        </Card>
-        <Card className="min-w-0">
-          <CardHeader title="Transactions you've made" description="Posted from here, newest first." />
+        }
+      />
+      {made.length > 0 && (
+        <Card className="mb-6 min-w-0 border-warning/40">
+          <CardHeader title="Not posted to ARK yet" description="These didn't go through. Retry is safe: ARK never posts the same transaction twice." />
           <MadeList rows={made} stuckBefore={today.getTime() - STUCK_MS} />
         </Card>
-      </div>
+      )}
     </>
   );
   if ("error" in result) {
@@ -111,11 +115,6 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
   await saveArkTransactions(result.rows, references);
   const tagged = result.rows.map((row) => ({ row, bivora: isBivoraTransaction(row, references) }));
   const shown = tagged.filter((t) => source === "all" || (source === "bivora") === t.bivora);
-  const sum = (types: number[]) =>
-    shown.filter((t) => types.includes(transactionTypeOf(t.row) ?? 0)).reduce((s, t) => s + Math.abs(amountOf(t.row)), 0);
-  const deposits = sum([1]);
-  const withdrawals = sum([2]);
-  const fromBivora = tagged.filter((t) => t.bivora).length;
 
   const keep = { from, to, ...(type && { type: String(type) }), ...(source !== "all" && { source }), ...(demo && { demo: "1" }), ...(node && { node: String(node) }) };
   const olderHref = result.older ? `/admin/ark/money?${new URLSearchParams({ ...keep, before: String(result.older) })}` : null;
@@ -159,17 +158,10 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
         </PendingForm>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard label="Deposits" value={money(deposits)} tone="up" />
-        <StatCard label="Withdrawals" value={money(withdrawals)} />
-        <StatCard label="Net" value={money(deposits - withdrawals)} tone={deposits - withdrawals >= 0 ? "up" : undefined} />
-        <StatCard label="Transactions" value={shown.length.toLocaleString("en-US")} hint={`${fromBivora} from Bivora · ${tagged.length - fromBivora} in ARK`} />
-      </div>
-
-      <Card className="mt-6">
+      <Card>
         <CardHeader
           title="Transactions"
-          description={`${from} to ${to}, newest first${before ? ", older page" : ""}. Totals cover the transactions on this page.`}
+          description={`${from} to ${to}, newest first${before ? ", older page" : ""}.`}
           action={before ? <PendingLink href={`/admin/ark/money?${new URLSearchParams(keep)}`} className={buttonClass("ghost")}>Newest</PendingLink> : undefined}
         />
         {result.clients.error && (

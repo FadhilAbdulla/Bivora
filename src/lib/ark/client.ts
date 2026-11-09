@@ -419,6 +419,15 @@ export async function provisionArkAccount(config: ArkConfig, client: {
   return { arkUserId: account.arkUserId, arkAccountId: account.arkAccountId, arkUsername: username };
 }
 
+/** Turns a client's ARK account into a demo account, or back into a real one. */
+export async function setArkDemo(config: ArkConfig, arkUserId: string, demo: boolean) {
+  const result = await arkRequest(config, `/admin/public/api/v2/user/${encodeURIComponent(arkUserId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ isDemo: demo }),
+  });
+  if (!result.ok) throw new ArkError(`ARK couldn't change the account type: ${result.message ?? result.status}`);
+}
+
 export async function resetArkPassword(config: ArkConfig, arkUserId: string, password: string) {
   await setPassword(config, arkUserId, password);
 }

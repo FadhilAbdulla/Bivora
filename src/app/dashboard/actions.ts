@@ -22,7 +22,7 @@ import { createSession } from "@/lib/session";
 const amount = (min: number) =>
   z.coerce
     .number({ error: "Enter a valid amount." })
-    .min(min, `The minimum amount is $${min}.`)
+    .min(min, min < 1 ? "Enter an amount above $0." : `The minimum amount is $${min}.`)
     .max(MAX_REQUEST_AMOUNT, "Amount is too large.")
     .refine((n) => Number.isInteger(Math.round(n * 100)) && Math.abs(n * 100 - Math.round(n * 100)) < 1e-6, {
       message: "Use at most two decimal places.",
@@ -144,7 +144,8 @@ export async function changePassword(_prev: FormState, formData: FormData): Prom
   // Signs out every other device; this one gets a fresh session.
   const updated = await db.user.update({
     where: { id: user.id },
-    data: { passwordHash: await hashPassword(parsed.data.newPassword), sessionVersion: { increment: 1 } },
+    // A new password no longer matches the one kept for their ARK account, so that copy goes.
+    data: { passwordHash: await hashPassword(parsed.data.newPassword), sessionVersion: { increment: 1 }, arkPasswordEnc: null },
   });
   await createSession("client", updated);
   return { success: "Password changed. Other devices have been signed out." };

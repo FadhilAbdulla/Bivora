@@ -4,7 +4,12 @@ import { refresh } from "next/cache";
 import { clearArkCache } from "@/lib/ark/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
+import { siteUrl } from "@/lib/brand";
+import { countryByIso, parsePhone } from "@/lib/countries";
+import { missingEmailSettings, sendAccountOpened, sendLater } from "@/lib/email";
+import { SecretKeyError, encryptSecret } from "@/lib/secrets";
 import { approveClient, resendCredentials } from "@/lib/client-approval";
+import { ArkError, loadArkConfig, setArkDemo } from "@/lib/ark/client";
 import { db } from "@/lib/db";
 import { formValues, type FormState } from "@/lib/form";
 import { FundError, adjustBalance, approveFundRequest, rejectFundRequest } from "@/lib/funds";
@@ -123,6 +128,48 @@ export async function resendArkCredentials(_prev: FormState, formData: FormData)
 
 const adminPassword = strongPassword(12);
 
+const newClientSchema = z.object({
+  firstName: z.string().trim().min(1, "Enter a first name.").max(60),
+  lastName: z.string().trim().min(1, "Enter a last name.").max(60),
+  email: z.email("Enter a valid email address.").trim().toLowerCase(),
+  phone: z.string().trim().regex(/^\+[1-9]\d{6,14}$/, "Enter a valid phone number."),
+  password: strongPassword(8, "The password"),
+});
+
+/**
+ * Opens a client account with a password the admin chooses. The same password signs them in to
+ * Bivora now and is given to their ARK account when they're approved (kept encrypted until then).
+ */
+export async function createClient(_prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requireAdmin();
+  const values = formValues(formData, ["password"]);
+  const parsed = newClientSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message, values };
+  if (!(await hit("admin-create-client", admin.id, 30, 60 * MINUTE))) return { error: TOO_MANY, values };
+
+  const { password, ...data } = parsed.data;
+  const existing = await db.user.findUnique({ where: { email: data.email } });
+  if (existing) {
+    return { error: existing.role === "USER" ? "A client with this email already exists." : "An admin uses this email. Use a different email.", values };
+  }
+  let arkPasswordEnc: string;
+  try {
+    arkPasswordEnc = encryptSecret(password);
+  } catch (e) {
+    if (e instanceof SecretKeyError) return { error: e.message, values };
+    throw e;
+  }
+
+  const user = await db.user.create({
+    data: { ...data, country: countryByIso(parsePhone(data.phone).iso).name, passwordHash: await hashPassword(password), arkPasswordEnc },
+  });
+  refresh();
+  if (!missingEmailSettings().length) {
+    sendLater("Account opened", () => sendAccountOpened({ email: user.email, firstName: user.firstName, url: `${siteUrl}/login` }));
+  }
+  return { success: `${user.firstName}'s account is ready. Share the password with them privately; add their documents on their page.` };
+}
+
 const newAdminSchema = z.object({
   firstName: z.string().trim().min(1, "Enter a first name.").max(60),
   lastName: z.string().trim().min(1, "Enter a last name.").max(60),
@@ -173,4 +220,23 @@ export async function changeAdminPassword(_prev: FormState, formData: FormData):
   });
   await createSession("admin", updated);
   return { success: "Password changed. Other devices have been signed out." };
+}
+
+/** Switches a client's ARK account between real and demo. */
+export async function setClientDemo(formData: FormData): Promise<FormState> {
+  await requireAdmin();
+  const id = String(formData.get("userId") ?? "");
+  const demo = formData.get("demo") === "1";
+  const user = await db.user.findFirst({ where: { id, role: "USER", arkUserId: { not: null } }, select: { id: true, arkUserId: true } });
+  if (!user?.arkUserId) return { error: "This client has no ARK account yet." };
+  try {
+    await setArkDemo(await loadArkConfig(), user.arkUserId, demo);
+  } catch (e) {
+    if (e instanceof ArkError) return { error: e.message };
+    throw e;
+  }
+  await db.user.update({ where: { id: user.id }, data: { arkIsDemo: demo } });
+  await clearArkCache();
+  refresh();
+  return { success: demo ? "Switched to a demo account." : "Switched to a real account." };
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { SubmitButton } from "@/components/submit-button";
 import { ClientPicker, type PickerClient } from "@/components/client-picker";
+import { Modal } from "@/components/modal";
 import { toast } from "@/components/toast";
 import { Alert, Button, Field, Input, Select } from "@/components/ui";
 import { addArkMoney, retryArkMoney, type MoneyFormState } from "./actions";
@@ -10,16 +11,47 @@ import { addArkMoney, retryArkMoney, type MoneyFormState } from "./actions";
 const newKey = () => crypto.randomUUID().replace(/-/g, "");
 
 /** Post a deposit, withdrawal, credit, adjustment or bonus to a client's ARK account. */
-export function MoneyForm({ clients, types, firstKey, defaultClient }: { clients: PickerClient[]; types: Record<number, string>; firstKey: string; defaultClient?: string }) {
+type MoneyFormProps = { clients: PickerClient[]; types: Record<number, string>; firstKey: string; defaultClient?: string };
+
+/** The button on Money flow: the form opens in a pop-up (already open when coming from a client's page). */
+export function AddMoneyButton(props: MoneyFormProps) {
+  const [open, setOpen] = useState(Boolean(props.defaultClient));
+  return (
+    <>
+      <Button onClick={() => setOpen(true)} className="shrink-0">Add money transaction</Button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="New money transaction"
+        description="Goes straight to the client's ARK account, and the client is emailed. It doesn't change their Bivora wallet."
+      >
+        <MoneyForm {...props} onDone={() => setOpen(false)} />
+      </Modal>
+    </>
+  );
+}
+
+export function MoneyForm({ clients, types, firstKey, defaultClient, onDone }: MoneyFormProps & { onDone?: () => void }) {
   // One key per transaction: a double click sends the same key, which is recorded once.
   const [key, setKey] = useState(firstKey);
   const [state, action] = useActionState(async (prev: MoneyFormState, data: FormData) => {
     const result = await addArkMoney(prev, data);
-    if (result?.success) toast(result.success);
+    if (result?.success) {
+      toast(result.success);
+      onDone?.();
+    }
     setKey(newKey());
     return result;
   }, null);
   const [type, setType] = useState(state?.values?.type ?? "");
+  // With the client already chosen (from their page), start at Type. The pop-up focuses its first
+  // field as it opens, so this runs just after.
+  const typeSelect = useRef<HTMLSelectElement>(null);
+  useEffect(() => {
+    if (!defaultClient) return;
+    const timer = setTimeout(() => typeSelect.current?.focus(), 60);
+    return () => clearTimeout(timer);
+  }, [defaultClient]);
   const v = state?.values ?? {};
 
   return (
@@ -47,7 +79,7 @@ export function MoneyForm({ clients, types, firstKey, defaultClient }: { clients
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Type">
-              <Select name="type" required autoFocus={Boolean(defaultClient) && !v.type} defaultValue={v.type ?? ""} onChange={(e) => setType(e.target.value)}>
+              <Select ref={typeSelect} name="type" required defaultValue={v.type ?? ""} onChange={(e) => setType(e.target.value)}>
                 <option value="" disabled>Choose…</option>
                 {Object.entries(types).map(([value, name]) => (
                   <option key={value} value={value}>{name}</option>

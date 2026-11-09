@@ -2,6 +2,7 @@ import "server-only";
 import { ArkError, type ArkConfig, generateArkPassword, loadArkConfig, provisionArkAccount, resetArkPassword } from "./ark/client";
 import { countryByIso, parsePhone } from "./countries";
 import { db } from "./db";
+import { decryptSecret } from "./secrets";
 import { missingEmailSettings, sendTradingCredentials } from "./email";
 import { isKycComplete } from "./kyc";
 
@@ -25,7 +26,7 @@ async function prepare(): Promise<{ config: ArkConfig } | { error: string }> {
 
 async function emailCredentials(
   userId: string,
-  client: { email: string; firstName: string; username: string; password: string; tradingUrl: string },
+  client: { email: string; firstName: string; username: string; password: string | null; tradingUrl: string },
 ) {
   try {
     await sendTradingCredentials(client);
@@ -61,7 +62,16 @@ export async function approveClient(userId: string): Promise<ApprovalResult> {
   });
   if (count === 0) return { error: "These documents have already been reviewed, or are being approved." };
 
-  const password = generateArkPassword();
+  // An admin who opened the account chose the client's password: their ARK account gets the same one.
+  let chosen: string | null = null;
+  if (user.arkPasswordEnc) {
+    try {
+      chosen = decryptSecret(user.arkPasswordEnc);
+    } catch {
+      chosen = null;
+    }
+  }
+  const password = chosen ?? generateArkPassword();
   let account;
   try {
     account = await provisionArkAccount(
@@ -77,14 +87,15 @@ export async function approveClient(userId: string): Promise<ApprovalResult> {
 
   await db.user.update({
     where: { id: userId },
-    data: { kycStatus: "APPROVED", kycReviewedAt: new Date(), ...account },
+    data: { kycStatus: "APPROVED", kycReviewedAt: new Date(), ...account, arkPasswordEnc: null },
   });
 
   const sent = await emailCredentials(userId, {
     email: user.email,
     firstName: user.firstName,
     username: account.arkUsername,
-    password,
+    // The same as their Bivora password, which they already know: never sent by email.
+    password: chosen ? null : password,
     tradingUrl: ready.config.tradingUrl,
   });
   return sent ? {} : { warning: EMAIL_FAILED };

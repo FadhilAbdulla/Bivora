@@ -70,7 +70,7 @@ export async function resolveGoogleUser(profile: GoogleProfile) {
     // Removing the password also ends any session made with it.
     data: {
       googleId: profile.sub,
-      ...(!isKycApproved(user.kycStatus) && { passwordHash: null, sessionVersion: { increment: 1 } }),
+      ...(!isKycApproved(user.kycStatus) && { passwordHash: null, sessionVersion: { increment: 1 }, arkPasswordEnc: null }),
     },
   });
   return { user: linked };

@@ -145,6 +145,35 @@ export function sendWelcomeEmail(client: { email: string; firstName: string }) {
   });
 }
 
+/** An admin opened the account with a password they share with the client themselves. */
+export function sendAccountOpened(client: { email: string; firstName: string; url: string }) {
+  return sendEmail({
+    to: client.email,
+    subject: "Your Bivora account is ready",
+    text: [
+      `Hi ${client.firstName},`,
+      "",
+      "Our team has opened a Bivora account for you. Sign in with this email address and the password our team gave you.",
+      "",
+      `Sign in: ${client.url}`,
+      "",
+      "Then finish your documents and accept the terms. We'll email your trading login once you're approved.",
+      "",
+      `Questions? Email ${SUPPORT}.`,
+      "",
+      RISK,
+    ].join("\n"),
+    html: layout(
+      `Welcome to Bivora, ${client.firstName}`,
+      paragraph("Our team has opened a Bivora account for you. Sign in with this email address and the password our team gave you.") +
+        button("Sign in", client.url) +
+        steps(["Check your documents", "Accept the terms", "We approve your account and email your trading login"]) +
+        note("Never share your password. Bivora will never ask for it by email or phone."),
+      "Your Bivora account is ready. Sign in to finish setting up.",
+    ),
+  });
+}
+
 export function sendPasswordResetEmail(client: { email: string; firstName: string; url: string }) {
   return sendEmail({
     to: client.email,
@@ -171,13 +200,15 @@ export function sendPasswordResetEmail(client: { email: string; firstName: strin
   });
 }
 
+/** `password` null: it's the same as their Bivora password, so it isn't written in the email. */
 export function sendTradingCredentials(client: {
   email: string;
   firstName: string;
   username: string;
-  password: string;
+  password: string | null;
   tradingUrl: string;
 }) {
+  const passwordLine = client.password ?? "Same as your Bivora password";
   const url = client.tradingUrl;
   const row = (label: string, value: string, last = false) =>
     `<tr><td style="padding:14px 18px;${last ? "" : `border-bottom:1px solid ${C.line};`}">` +
@@ -193,7 +224,7 @@ export function sendTradingCredentials(client: {
       "Your documents have been approved and your Bivora trading account is ready.",
       "",
       `Username: ${client.username}`,
-      `Temporary password: ${client.password}`,
+      `${client.password ? "Temporary password" : "Password"}: ${passwordLine}`,
       `Log in: ${url}`,
       "",
       "We recommend changing this password after you log in. Please don't share these details with anyone. Bivora will never ask for your password.",
@@ -209,7 +240,7 @@ export function sendTradingCredentials(client: {
     html: layout(
       "Your trading account is ready",
       paragraph(`Hi ${escapeHtml(client.firstName)}, good news: your documents are approved. Here are your login details for the trading platform.`) +
-        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 22px;background:${C.soft};border:1px solid ${C.line};border-radius:12px;">${row("Username", client.username)}${row("Temporary password", client.password, true)}</table>` +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 22px;background:${C.soft};border:1px solid ${C.line};border-radius:12px;">${row("Username", client.username)}${row(client.password ? "Temporary password" : "Password", passwordLine, true)}</table>` +
         button("Log in to trade", url) +
         `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px;"><tr><td style="padding:12px 16px;background:#fbf6e7;border-left:3px solid ${C.gold};border-radius:6px;font-size:13px;line-height:1.55;color:#5c4a1c;">` +
         "We recommend changing this password after you log in. Please don't share these details with anyone. Bivora will never ask for your password." +

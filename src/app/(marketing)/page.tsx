@@ -7,7 +7,7 @@ import { ASSET_CLASSES } from "@/lib/markets";
 const platform = [
   {
     title: "Fast, tracked funding",
-    body: "Deposit by bank transfer, card or USDT and follow each request from submission to credit.",
+    body: "Deposit by bank transfer and follow each request from submission to credit.",
     icon: "M12 5v14M5 12l7 7 7-7",
   },
   {

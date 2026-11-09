@@ -5,12 +5,14 @@ import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "r
 import { Modal, ModalFooter } from "@/components/modal";
 import { Button, ButtonLink, cn } from "@/components/ui";
 import {
+  BOTH_SLOT,
   IMAGE_TYPES,
   KYC_DOCS,
   MAX_DOCUMENT_BYTES,
   PDF_TYPE,
   isDocComplete,
   type KycDocumentInfo,
+  type KycDocDef,
   type KycSlotDef,
 } from "@/lib/kyc";
 
@@ -27,30 +29,11 @@ export function DocumentStep({
 }) {
   const def = KYC_DOCS.find((d) => d.type === type)!;
   const [documents, setDocuments] = useState(initialDocuments);
-  const find = (slot: string) => documents.find((d) => d.slot === slot);
-  const frontIsPdf = find("FRONT")?.mimeType === PDF_TYPE;
   const complete = isDocComplete(def, documents);
 
   return (
     <div className="mt-5 space-y-4">
-      <section className="space-y-4">
-        {def.slots
-          .filter((s) => !(s.slot === "BACK" && frontIsPdf))
-          .map((s) => (
-            <DocumentSlot
-              key={s.slot}
-              type={def.type}
-              def={s}
-              showLabel={def.slots.length > 1}
-              document={find(s.slot)}
-              onUploaded={(doc, removedId) =>
-                setDocuments((all) => [...all.filter((d) => d.slot !== doc.slot && d.id !== removedId), doc])
-              }
-              onRemoved={(id) => setDocuments((all) => all.filter((d) => d.id !== id))}
-            />
-          ))}
-        {frontIsPdf && def.slots.length > 1 && <p className="text-sm text-muted">Your PDF covers both sides.</p>}
-      </section>
+      <DocumentSlots def={def} documents={documents} onChange={setDocuments} />
 
       <div className="sticky bottom-0 -mx-4 flex gap-2 border-t border-line bg-surface px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6">
         {backHref && (
@@ -72,9 +55,74 @@ export function DocumentStep({
   );
 }
 
+/**
+ * The upload boxes for one document. An ID can come as separate front and back files or as one
+ * image or PDF with both sides. `api` is where uploads go: the client's own, or an admin's for a client.
+ */
+export function DocumentSlots({
+  def,
+  documents,
+  onChange,
+  api = "/api/kyc",
+}: {
+  def: KycDocDef;
+  documents: KycDocumentInfo[];
+  onChange: (update: (all: KycDocumentInfo[]) => KycDocumentInfo[]) => void;
+  api?: string;
+}) {
+  const mine = documents.filter((d) => d.type === def.type);
+  const find = (slot: string) => mine.find((d) => d.slot === slot);
+  const [combined, setCombined] = useState(() => Boolean(find(BOTH_SLOT.slot)));
+  const frontIsPdf = find("FRONT")?.mimeType === PDF_TYPE;
+  const slots = def.combined && combined ? [BOTH_SLOT] : def.slots.filter((s) => !(s.slot === "BACK" && frontIsPdf));
+  const onUploaded = (doc: KycDocumentInfo, removedIds: string[]) =>
+    onChange((all) => [...all.filter((d) => !(d.type === doc.type && d.slot === doc.slot) && !removedIds.includes(d.id)), doc]);
+
+  return (
+    <section className="space-y-4">
+      {def.combined && (
+        <div role="radiogroup" aria-label={`How is your ${def.title.toLowerCase()} photographed?`} className="grid grid-cols-2 gap-1 rounded-lg bg-surface-2 p-1 text-sm">
+          {[
+            [false, "Front and back separately"],
+            [true, "Both sides in one image"],
+          ].map(([value, label]) => (
+            <button
+              key={String(value)}
+              type="button"
+              role="radio"
+              aria-checked={combined === value}
+              onClick={() => setCombined(value as boolean)}
+              className={cn("rounded-md px-2 py-2 font-medium", combined === value ? "bg-surface text-foreground shadow-sm" : "text-muted hover:text-foreground")}
+            >
+              {label as string}
+            </button>
+          ))}
+        </div>
+      )}
+      {slots.map((s) => (
+        <DocumentSlot
+          key={s.slot}
+          type={def.type}
+          def={s}
+          api={api}
+          showLabel={slots.length > 1 || s === BOTH_SLOT}
+          document={find(s.slot)}
+          onUploaded={onUploaded}
+          onRemoved={(id) => onChange((all) => all.filter((d) => d.id !== id))}
+        />
+      ))}
+      {!combined && frontIsPdf && def.slots.length > 1 && <p className="text-sm text-muted">Your PDF covers both sides.</p>}
+      {def.combined && combined && !find(BOTH_SLOT.slot) && (find("FRONT") || find("BACK")) && (
+        <p className="text-sm text-muted">Uploading one image here replaces the separate front and back.</p>
+      )}
+    </section>
+  );
+}
+
 function DocumentSlot({
   type,
   def,
+  api,
   showLabel,
   document: doc,
   onUploaded,
@@ -82,9 +130,10 @@ function DocumentSlot({
 }: {
   type: string;
   def: KycSlotDef;
+  api: string;
   showLabel: boolean;
   document?: KycDocumentInfo;
-  onUploaded: (doc: KycDocumentInfo, removedId: string | null) => void;
+  onUploaded: (doc: KycDocumentInfo, removedIds: string[]) => void;
   onRemoved: (id: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -106,7 +155,7 @@ function DocumentSlot({
       const post = (path: string, body: object) =>
         fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
-      const link = await post("/api/kyc/upload-link", { type, slot: def.slot, size: file.size });
+      const link = await post(`${api}/upload-link`, { type, slot: def.slot, size: file.size });
       const { url, storageKey, error: linkError } = await link.json().catch(() => ({}));
       if (!link.ok) {
         setError(linkError ?? "Upload failed. Please try again.");
@@ -119,10 +168,10 @@ function DocumentSlot({
         return;
       }
 
-      const res = await post("/api/kyc", { type, slot: def.slot, storageKey, fileName: file.name });
+      const res = await post(api, { type, slot: def.slot, storageKey, fileName: file.name });
       const json = await res.json().catch(() => null);
       if (!res.ok) setError(json?.error ?? "Upload failed. Please try again.");
-      else onUploaded(json.document, json.removedId);
+      else onUploaded(json.document, json.removedIds ?? (json.removedId ? [json.removedId] : []));
     } catch {
       setError("Upload failed. Check your connection and try again.");
     } finally {
@@ -134,7 +183,7 @@ function DocumentSlot({
     if (!doc) return;
     setError(null);
     setBusy(true);
-    const res = await fetch(`/api/kyc/${doc.id}`, { method: "DELETE" }).catch(() => null);
+    const res = await fetch(`${api}/${doc.id}`, { method: "DELETE" }).catch(() => null);
     setBusy(false);
     if (res?.ok) onRemoved(doc.id);
     else setError("Couldn't remove the file. Please try again.");

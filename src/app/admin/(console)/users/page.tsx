@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { kycStage } from "@/lib/kyc";
 import { formatDate, formatMoney } from "@/lib/money";
 import { QuickApprove } from "../kyc-review";
+import { AddClientButton } from "./add-client";
 
 export const metadata: Metadata = { title: "Clients" };
 
@@ -39,7 +40,8 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
         title="Clients"
         description="Every registered account, its balance and status."
         action={
-          <form className="relative w-full sm:w-72">
+          <div className="flex w-full gap-2 sm:w-auto">
+          <form className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
             <Input name="q" placeholder="Search name or email…" defaultValue={query} className={query ? "pr-10" : undefined} />
             {query && (
               <Link
@@ -53,6 +55,8 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
               </Link>
             )}
           </form>
+          <AddClientButton />
+          </div>
         }
       />
       <Card>

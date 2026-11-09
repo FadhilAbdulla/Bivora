@@ -34,6 +34,11 @@ model User {
   arkAccountId    String?
   arkUserId       String?
   arkUsername     String?
+  // Set by an admin who chose the client's password: the same password is given to their ARK
+  // account at approval, then this is cleared. Encrypted like the ARK dealer password.
+  arkPasswordEnc  String?
+  // Whether the client's ARK account is a demo account (switched from the client's page).
+  arkIsDemo       Boolean   @default(false)
   arkCredentialsSentAt DateTime?
   // Onboarding. kycStatus: NOT_SUBMITTED | PENDING | APPROVING | APPROVED | REJECTED
   termsAcceptedAt DateTime?
