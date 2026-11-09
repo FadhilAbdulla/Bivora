@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import type { ReactNode } from "react";
-import { Alert, Button, ButtonLink, Card, CardHeader, EmptyState, Field, Input, PageHeader, Select, StatCard, cn } from "@/components/ui";
+import { Alert, Button, Card, CardHeader, EmptyState, Field, Input, PageHeader, Select, StatCard, buttonClass, cn } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { MANUAL_MONEY_TYPES } from "@/lib/ark/client";
 import { STUCK_MS } from "@/lib/ark-money";
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/money";
+import { PendingArea, PendingForm, PendingLink } from "@/components/pending-nav";
 import { MoneyForm, RetryButton } from "./money-form";
 import {
   TRANSACTION_TYPES,
@@ -15,6 +16,7 @@ import {
   bivoraAccounts,
   getArkMoney,
   isBivoraTransaction,
+  saveArkTransactions,
   nameOf,
   parentIdOf,
   transactionIdOf,
@@ -52,6 +54,8 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
   const demo = param(q.demo) === "1";
   const node = id(param(q.node));
   const before = id(param(q.before));
+  // From a client's page: that client is chosen in the New transaction form.
+  const forClient = param(q.client);
 
   const [result, accounts, arkClients, made] = await Promise.all([
     getArkMoney({ node, from, to, type: type && TRANSACTION_TYPES[type] ? type : undefined, demo, before }),
@@ -72,12 +76,14 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
     <>
       <PageHeader title="ARK money flow" description="Post credit, adjustments and bonuses to clients, and see every money transaction in ARK." />
       <div className="mb-6 grid items-start gap-4 sm:gap-6 xl:grid-cols-[minmax(0,26rem)_1fr]">
-        <Card>
-          <CardHeader title="New transaction" description="Goes straight to the client's ARK account, and the client is emailed." />
+        <Card id="new" className="scroll-mt-20">
+          <CardHeader title="New transaction" description="Goes straight to the client's ARK account, and the client is emailed. It doesn't change their Bivora wallet." />
           <MoneyForm
+            key={forClient ?? ""}
+            defaultClient={arkClients.some((c) => c.id === forClient) ? forClient : undefined}
             firstKey={randomUUID().replace(/-/g, "")}
             types={MANUAL_MONEY_TYPES}
-            clients={arkClients.map((c) => ({ id: c.id, label: `${c.firstName} ${c.lastName} · ${c.arkUsername ?? c.email}` }))}
+            clients={arkClients.map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`, detail: [c.arkUsername, c.email].filter(Boolean).join(" · ") }))}
           />
         </Card>
         <Card className="min-w-0">
@@ -100,7 +106,10 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
   }
 
   const names = new Map((result.clients.data?.rows ?? []).map((c) => [userIdOf(c)!, c]));
-  const tagged = result.rows.map((row) => ({ row, bivora: isBivoraTransaction(row, result.bivoraReferences) }));
+  const references = new Set(result.bivoraReferences);
+  // Keep a copy of Bivora clients' rows, so each client's page shows them.
+  await saveArkTransactions(result.rows, references);
+  const tagged = result.rows.map((row) => ({ row, bivora: isBivoraTransaction(row, references) }));
   const shown = tagged.filter((t) => source === "all" || (source === "bivora") === t.bivora);
   const sum = (types: number[]) =>
     shown.filter((t) => types.includes(transactionTypeOf(t.row) ?? 0)).reduce((s, t) => s + Math.abs(amountOf(t.row)), 0);
@@ -112,10 +121,10 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
   const olderHref = result.older ? `/admin/ark/money?${new URLSearchParams({ ...keep, before: String(result.older) })}` : null;
 
   return (
-    <>
+    <PendingArea>
       {header}
       <Card className="mb-6">
-        <form className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 sm:p-5 lg:grid-cols-6 lg:items-end">
+        <PendingForm action="/admin/ark/money" className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 sm:p-5 lg:grid-cols-6 lg:items-end">
           <Field label="From">
             <Input type="date" name="from" defaultValue={from} max={to} />
           </Field>
@@ -147,7 +156,7 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
             </label>
             <Button type="submit" variant="secondary">Apply</Button>
           </div>
-        </form>
+        </PendingForm>
       </Card>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -161,7 +170,7 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
         <CardHeader
           title="Transactions"
           description={`${from} to ${to}, newest first${before ? ", older page" : ""}. Totals cover the transactions on this page.`}
-          action={before ? <ButtonLink href={`/admin/ark/money?${new URLSearchParams(keep)}`} variant="ghost">Newest</ButtonLink> : undefined}
+          action={before ? <PendingLink href={`/admin/ark/money?${new URLSearchParams(keep)}`} className={buttonClass("ghost")}>Newest</PendingLink> : undefined}
         />
         {result.clients.error && (
           <div className="px-4 pt-4 sm:px-5"><Alert tone="info">Client names couldn&apos;t be loaded: {result.clients.error}</Alert></div>
@@ -214,11 +223,11 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
         )}
         {olderHref && (
           <div className="border-t border-line p-4 text-center sm:p-5">
-            <ButtonLink href={olderHref} variant="secondary">Load older transactions</ButtonLink>
+            <PendingLink href={olderHref} className={buttonClass("secondary")}>Load older transactions</PendingLink>
           </div>
         )}
       </Card>
-    </>
+    </PendingArea>
   );
 }
 
@@ -265,7 +274,7 @@ function MadeList({ rows, stuckBefore }: {
     <ul className="divide-y divide-line">
       {rows.map((r) => {
         const amount = Number(r.amount);
-        const minus = r.type === 4 || amount < 0;
+        const minus = r.type === 2 || r.type === 4 || amount < 0;
         const status = STATUS[r.status] ?? { label: r.status };
         const stuck = r.status === "PENDING" && (r.attemptAt ?? r.createdAt).getTime() < stuckBefore;
         return (

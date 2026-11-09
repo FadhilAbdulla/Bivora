@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState } from "react";
+import { usePendingNav } from "@/components/pending-nav";
 import { Select } from "@/components/ui";
 
 /** Switches the accounts list to another office. */
@@ -13,19 +13,21 @@ export function OfficePicker({ offices, top, topName, node, source }: {
   /** The Bivora / ARK filter, kept when the office changes. */
   source?: string;
 }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
+  const { pending, go } = usePendingNav();
+  // Shows the new choice while its page loads (the page remounts this with the new node).
+  const [shown, setShown] = useState(String(node));
   const listed = node === top || offices.some((o) => o.id === node);
 
   return (
     <Select
       aria-label="Office"
-      value={String(node)}
+      value={shown}
       disabled={pending}
       className="sm:w-64"
       onChange={(e) => {
+        setShown(e.target.value);
         const next = new URLSearchParams({ node: e.target.value, ...(source && { source }) });
-        start(() => router.push(`/admin/ark?${next}`));
+        go(`/admin/ark?${next}`);
       }}
     >
       {offices.map((o) => (

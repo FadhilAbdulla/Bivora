@@ -1,8 +1,9 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { clearArkCache } from "@/lib/ark/cache";
 import { z } from "zod";
-import { ARK_USER_CURRENCY_ID, ArkError, connectArk, loadArkConfig } from "@/lib/ark/client";
+import { ARK_USER_CURRENCY_ID, ArkError, connectArk, forgetArkSession, loadArkConfig } from "@/lib/ark/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formValues, type FormState } from "@/lib/form";
@@ -77,6 +78,9 @@ export async function saveArkSettings(_prev: FormState, formData: FormData): Pro
     }),
     db.arkSettingsChange.create({ data: { adminEmail: admin.email, fields: changed.join(", ") } }),
   ]);
+  forgetArkSession();
+  // New details may mean a different office or policies: fetch ARK's lists again.
+  await clearArkCache();
   refresh();
   return { success: "ARK settings saved." };
 }

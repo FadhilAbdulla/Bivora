@@ -23,6 +23,11 @@ export function Button({
   return <button className={cn(buttonBase, buttonVariants[variant], className)} {...props} />;
 }
 
+/** Button styles for a link-like element rendered elsewhere (e.g. a PendingLink). */
+export function buttonClass(variant: keyof typeof buttonVariants = "primary", className?: string) {
+  return cn(buttonBase, buttonVariants[variant], className);
+}
+
 export function ButtonLink({
   variant = "primary",
   className,

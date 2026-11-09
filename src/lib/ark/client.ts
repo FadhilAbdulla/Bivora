@@ -94,16 +94,36 @@ const SESSION_IDLE_MS = 50 * 60_000;
 const LOGIN_CLAIM_MS = 30_000;
 let lastTouch = 0;
 
-async function storedSession() {
+// The session is kept in memory too, so each ARK request doesn't need a database read (pages make
+// dozens of ARK requests, and the database allows only a few connections at once). It's re-read
+// from the database at most once a minute, or at once when ARK refuses the token.
+type Session = { token: string; usedAt: Date };
+let memory: (Session & { readAt: number }) | null = null;
+const memoryMs = () => {
+  const n = Number(process.env.ARK_SESSION_MEMORY_MS ?? 60_000);
+  return Number.isFinite(n) && n >= 0 ? n : 60_000;
+};
+const remember = (s: Session | null) => {
+  memory = s ? { ...s, readAt: Date.now() } : null;
+  return s;
+};
+
+/** Drops this server's copy of the session, e.g. after the ARK settings change. */
+export function forgetArkSession() {
+  memory = null;
+}
+
+async function storedSession(fresh = false): Promise<Session | null> {
+  if (!fresh && memory && Date.now() - memory.readAt < memoryMs()) return { token: memory.token, usedAt: memory.usedAt };
   const row = await db.arkSettings.findUnique({
     where: { id: "ark" },
     select: { sessionTokenEnc: true, sessionUsedAt: true },
   });
-  if (!row?.sessionTokenEnc || !row.sessionUsedAt) return null;
+  if (!row?.sessionTokenEnc || !row.sessionUsedAt) return remember(null);
   try {
-    return { token: decryptSecret(row.sessionTokenEnc), usedAt: row.sessionUsedAt };
+    return remember({ token: decryptSecret(row.sessionTokenEnc), usedAt: row.sessionUsedAt });
   } catch {
-    return null;
+    return remember(null);
   }
 }
 
@@ -120,17 +140,19 @@ async function loginOnce(config: ArkConfig) {
     // Someone else is logging in: use their session when it lands.
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 500));
-      const s = await storedSession();
+      const s = await storedSession(true);
       if (s && s.usedAt >= started) return s.token;
     }
     throw new ArkError("ARK is busy signing in. Try again in a moment.");
   }
   try {
     const token = await loginDealer(config);
+    const usedAt = new Date();
     await db.arkSettings.update({
       where: { id: "ark" },
-      data: { sessionTokenEnc: encryptSecret(token), sessionUsedAt: new Date(), sessionLoginAt: null },
+      data: { sessionTokenEnc: encryptSecret(token), sessionUsedAt: usedAt, sessionLoginAt: null },
     });
+    remember({ token, usedAt });
     lastTouch = Date.now();
     return token;
   } catch (e) {
@@ -141,17 +163,23 @@ async function loginOnce(config: ArkConfig) {
 
 /** The saved session, or a new one. `stale` is a token ARK just refused. */
 async function sessionToken(config: ArkConfig, stale?: string) {
-  const s = await storedSession();
+  // After a refusal, look in the database: another server may already have a newer session.
+  const s = await storedSession(Boolean(stale));
   if (s && isLive(s) && s.token !== stale) return s.token;
   return loginOnce(config);
 }
 
 /** ARK counts every request as activity, so record it (at most once a minute). */
 async function touch(token: string) {
+  if (memory?.token === token) memory.usedAt = new Date();
   if (Date.now() - lastTouch < 60_000) return;
   lastTouch = Date.now();
-  const s = await storedSession();
-  if (s?.token === token) await db.arkSettings.update({ where: { id: "ark" }, data: { sessionUsedAt: new Date() } });
+  const s = await storedSession(true);
+  if (s?.token === token) {
+    const usedAt = new Date();
+    await db.arkSettings.update({ where: { id: "ark" }, data: { sessionUsedAt: usedAt } });
+    remember({ token, usedAt });
+  }
 }
 
 const isAuthFailure = (r: { ok: boolean; status: number; message?: string }) =>
@@ -186,16 +214,19 @@ export async function connectArk(config: ArkConfig) {
 export async function arkHeartbeat(): Promise<"ok" | "no-session" | "ended"> {
   const saved = await db.arkSettings.findUnique({ where: { id: "ark" } });
   if (!saved) return "no-session";
-  const s = await storedSession();
+  const s = await storedSession(true);
   if (!s || !isLive(s)) return "no-session";
   const config = await loadArkConfig();
   const result = await arkFetch(config, "/admin/public/api/v2/heartbeat", { method: "GET", token: s.token });
   if (isAuthFailure(result)) {
     await db.arkSettings.updateMany({ where: { id: "ark", sessionUsedAt: s.usedAt }, data: { sessionTokenEnc: null, sessionUsedAt: null } });
+    forgetArkSession();
     return "ended";
   }
   if (!result.ok) throw new ArkError(`ARK heartbeat failed: ${result.message ?? result.status}`);
-  await db.arkSettings.update({ where: { id: "ark" }, data: { sessionUsedAt: new Date() } });
+  const usedAt = new Date();
+  await db.arkSettings.update({ where: { id: "ark" }, data: { sessionUsedAt: usedAt } });
+  remember({ token: s.token, usedAt });
   return "ok";
 }
 
@@ -394,8 +425,8 @@ export async function resetArkPassword(config: ArkConfig, arkUserId: string, pas
 
 // ---------- Money transactions ----------
 
-/** ARK's trxType values an admin may post by hand. Deposits and withdrawals go through fund requests. */
-export const MANUAL_MONEY_TYPES = { 3: "Credit in", 4: "Credit out", 5: "Adjustment", 6: "Bonus" } as const;
+/** ARK's trxType values an admin may post by hand from Money flow. */
+export const MANUAL_MONEY_TYPES = { 1: "Deposit", 2: "Withdrawal", 3: "Credit in", 4: "Credit out", 5: "Adjustment", 6: "Bonus" } as const;
 export type ManualMoneyType = keyof typeof MANUAL_MONEY_TYPES;
 
 /** ARK's date format: the server's local time, `yyyy-MM-dd HH:mm:ss.SSS`. */

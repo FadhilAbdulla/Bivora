@@ -27,7 +27,7 @@ Responses share the envelope `{ data, message, httpStatus, errorCode, success }`
 | Bivora function (`src/lib/ark/index.ts`) | ARK endpoint |
 | --- | --- |
 | `provisionArkAccount` (`client.ts`) | Username = first name + 4 random digits (e.g. `Fadhil3546`), checked free with `GET /admin/public/api/v2/username/{name}` (404 = free) and kept on the client before `POST /admin/public/api/v2/user` — Create Client, then the same lookup for its IDs. A retried approval reuses its kept name only if that ARK account carries the client's `customData.bivoraUserId` (or email). |
-| `postArkMoney` (`client.ts`), used by `src/lib/ark-money.ts` | `POST /admin/public/api/v2/money/transaction` with `userId`, `trxType` (3 credit in · 4 credit out · 5 adjustment · 6 bonus), `trxAmount`, `trxComment` ("Bivora …"), `trxDate`, and the `ArkMoneyTransaction` id as `requestReference`. ARK answers "Request reference already used" to a repeat, which a retry treats as done. |
+| `postArkMoney` (`client.ts`), used by `src/lib/ark-money.ts` | `POST /admin/public/api/v2/money/transaction` with `userId`, `trxType` (1 deposit · 2 withdrawal · 3 credit in · 4 credit out · 5 adjustment · 6 bonus), `trxAmount`, `trxComment` ("Bivora …"), `trxDate`, and the `ArkMoneyTransaction` id as `requestReference`. ARK answers "Request reference already used" to a repeat, which a retry treats as done. |
 | `resetArkPassword` (`client.ts`) | `PUT /admin/public/api/v2/user/{userId}` with `{ "password": "…", "forceChangePassword": true }` |
 | `getAccountSummary` | `GET /trading/public/api/v2/userFinancials/{userId}` — Financial Standing |
 | `getOpenPositions` | `GET /trading/public/api/v2/report/open/positions/{userId}/0?fromDate&toDate&limit&offset` (0 = buy+sell) |

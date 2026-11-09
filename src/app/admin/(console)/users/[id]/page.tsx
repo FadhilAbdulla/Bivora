@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { FundRequestTable } from "@/components/fund-request-table";
 import { Button, Card, CardHeader, EmptyState, PageHeader, StatCard, StatusBadge, Table, cn } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
@@ -12,6 +13,7 @@ import { setUserStatus } from "../../actions";
 import { KycReview, ResendCredentials } from "../../kyc-review";
 import { ReviewActions } from "../../review-actions";
 import { AdjustBalanceForm } from "./adjust-balance-form";
+import { ArkMoneySection, ArkMoneySectionLoading } from "./ark-money-section";
 
 export const metadata: Metadata = { title: "Client" };
 
@@ -127,6 +129,12 @@ export default async function UserDetailPage({ params }: PageProps<"/admin/users
           </dl>
           <ResendCredentials userId={user.id} sent={Boolean(user.arkCredentialsSentAt)} />
         </Card>
+      )}
+
+      {user.arkUserId && (
+        <Suspense fallback={<ArkMoneySectionLoading />}>
+          <ArkMoneySection userId={user.id} arkUserId={user.arkUserId} />
+        </Suspense>
       )}
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_22rem]">

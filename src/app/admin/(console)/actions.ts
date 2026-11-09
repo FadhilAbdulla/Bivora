@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { clearArkCache } from "@/lib/ark/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { approveClient, resendCredentials } from "@/lib/client-approval";
@@ -95,6 +96,8 @@ export async function reviewKyc(_prev: FormState, formData: FormData): Promise<F
 
   if (decision === "APPROVED") {
     const { error, warning } = await approveClient(userId);
+    // A new ARK account: show it on ARK accounts straight away.
+    await clearArkCache();
     if (error) return { error };
     refresh();
     return warning ? { error: warning } : { success: "Approved. Login details sent to the client." };

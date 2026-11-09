@@ -224,6 +224,10 @@ export function sendTradingCredentials(client: {
 function describeMoney(type: number, amount: number, currency: string) {
   const value = formatMoney(Math.abs(amount), currency);
   switch (type) {
+    case 1:
+      return { subject: `${value} deposited to your account`, title: "Deposit received", line: `<strong>${value}</strong> has been deposited to your trading account.`, added: true };
+    case 2:
+      return { subject: `${value} withdrawn from your account`, title: "Withdrawal processed", line: `<strong>${value}</strong> has been withdrawn from your trading account.`, added: false };
     case 3:
       return { subject: `${value} credit added to your account`, title: "Credit added", line: `Your trading account has been credited with <strong>${value}</strong> credit.`, added: true };
     case 4:

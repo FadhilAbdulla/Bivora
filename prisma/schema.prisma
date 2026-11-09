@@ -52,6 +52,7 @@ model User {
   bankAccounts     BankAccount[]
   arkMoney         ArkMoneyTransaction[] @relation("arkMoneyClient")
   arkMoneyMade     ArkMoneyTransaction[] @relation("arkMoneyAdmin")
+  arkTransactions  ArkTransaction[]
 }
 
 // type:   DEPOSIT | WITHDRAWAL
@@ -189,7 +190,7 @@ model ArkMoneyTransaction {
   userId      String
   user        User      @relation("arkMoneyClient", fields: [userId], references: [id])
   arkUserId   String
-  // ARK trxType: 3 credit in, 4 credit out, 5 adjustment, 6 bonus.
+  // ARK trxType: 1 deposit, 2 withdrawal, 3 credit in, 4 credit out, 5 adjustment, 6 bonus.
   type        Int
   amount      Decimal
   comment     String?
@@ -206,4 +207,35 @@ model ArkMoneyTransaction {
 
   @@index([createdAt])
   @@index([userId, createdAt])
+}
+
+// A copy of every ARK money transaction on a Bivora client's ARK account, whether it was made in
+// Bivora or in ARK directly, so the client's page can show it. Filled from ARK's money report
+// (Money flow, the client's page) and straight away when Bivora posts one. id is ARK's transaction ID.
+model ArkTransaction {
+  id           String   @id
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  arkUserId    String
+  // ARK transactionTypeId: 1 deposit, 2 withdrawal, 3 credit in, 4 credit out, 5 adjustment, 6 bonus.
+  type         Int
+  amount       Decimal
+  comment      String?
+  reference    String?
+  madeInBivora Boolean  @default(false)
+  // ARK's own time, as it sends it (server local time, yyyy-MM-dd HH:mm:ss), so it sorts as text.
+  time         String
+  savedAt      DateTime @default(now())
+
+  @@index([userId, time])
+}
+
+// The last good ARK reply for each admin view, so pages show it at once and refresh it in the
+// background (src/lib/ark/cache.ts). Safe to empty at any time.
+model ArkCache {
+  key          String    @id
+  data         Json
+  fetchedAt    DateTime
+  // Set while one server refreshes this entry, so others don't do the same.
+  refreshingAt DateTime?
 }

@@ -4,7 +4,7 @@ import { ArkError, MANUAL_MONEY_TYPES, loadArkConfig, postArkMoney, type ManualM
 import { db } from "./db";
 import { sendArkMoneyEmail } from "./email";
 
-// Money an admin posts to a client's ARK account by hand: credit in/out, adjustment, bonus.
+// Money an admin posts to a client's ARK account by hand: deposit, withdrawal, credit in/out, adjustment, bonus.
 // The row is written first and its id goes to ARK as requestReference, so ARK itself refuses a
 // second post of the same transaction (a double click, a retry after a timeout).
 
@@ -25,9 +25,15 @@ export function checkMoneyInput(type: number, rawAmount: string) {
   if (!/^-?\d+(\.\d{1,2})?$/.test(text)) return { error: "Enter an amount with up to 2 decimals." };
   const amount = Number(text);
   if (amount === 0) return { error: "Enter an amount other than 0." };
-  if (amount < 0 && type !== 5) return { error: "Only an adjustment can be negative. Use Credit out to remove credit." };
+  if (amount < 0 && type !== 5) return { error: "Only an adjustment can be negative. Use Withdrawal or Credit out to take money out." };
   if (Math.abs(amount) > MAX_AMOUNT) return { error: `The most one transaction can be is ${MAX_AMOUNT.toLocaleString("en-US")}.` };
   return { type, amount };
+}
+
+/** Server local time as ARK writes it: yyyy-MM-dd HH:mm:ss. */
+function localTime(d: Date) {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
 async function send(id: string): Promise<MoneyResult> {
@@ -65,6 +71,13 @@ async function send(id: string): Promise<MoneyResult> {
     }
   }
   await db.arkMoneyTransaction.update({ where: { id }, data: { status: "DONE", error: null, ...(arkTrxId && { arkTrxId }) } });
+  // Shown on the client's page at once; ARK's report brings the same row later and is skipped.
+  if (arkTrxId) {
+    await db.arkTransaction.createMany({
+      data: [{ id: arkTrxId, userId: row.userId, arkUserId: row.arkUserId, type, amount, comment: row.comment, reference: row.id, madeInBivora: true, time: localTime(new Date()) }],
+      skipDuplicates: true,
+    });
+  }
 
   try {
     await sendArkMoneyEmail(row.user, { type, amount, note: row.comment });

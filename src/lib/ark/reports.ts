@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "../db";
+import { arkCached } from "./cache";
 import { ArkError, arkRequest, ensureArkSession, loadArkConfig, type ArkConfig } from "./client";
 
 // Read-only ARK reports for the admin console: client accounts, money transactions and settings lists.
@@ -137,7 +138,7 @@ export type ArkOverview =
  * Client accounts under one office. With no office asked for, it opens on the office new clients
  * are created in (ARK settings), or everything under the top node when that office isn't listed.
  */
-export async function getArkOverview(requestedNode?: number): Promise<ArkOverview> {
+async function loadArkOverview(requestedNode?: number): Promise<ArkOverview> {
   let config: ArkConfig;
   let top: number;
   try {
@@ -197,7 +198,7 @@ async function clientPolicies(config: ArkConfig, kind: "generic" | "currency") {
 }
 
 /** Every office the dealer can see and the client policies, for the settings dropdowns. */
-export async function getArkChoices(): Promise<ArkChoices | { error: string }> {
+async function loadArkChoices(): Promise<ArkChoices | { error: string }> {
   let config: ArkConfig;
   try {
     config = await loadArkConfig();
@@ -283,10 +284,10 @@ export type ArkMoney =
       older?: number;
       clients: Section<{ rows: ArkRow[]; capped: boolean }>;
       /** FundRequest and ArkMoneyTransaction IDs Bivora sent to ARK as requestReference. */
-      bivoraReferences: Set<string>;
+      bivoraReferences: string[];
     };
 
-export async function getArkMoney(filters: MoneyFilters): Promise<ArkMoney> {
+async function loadArkMoney(filters: MoneyFilters): Promise<ArkMoney> {
   let config: ArkConfig;
   let top: number;
   try {
@@ -327,12 +328,12 @@ export async function getArkMoney(filters: MoneyFilters): Promise<ArkMoney> {
     rows,
     older: rows.length === MONEY_PAGE && ids.length ? Math.min(...ids) : undefined,
     clients,
-    bivoraReferences: new Set(known.map((k) => k.id)),
+    bivoraReferences: known.map((k) => k.id),
   };
 }
 
 /** Bivora posts money with its FundRequest ID as requestReference and a comment starting "Bivora". */
-export function isBivoraTransaction(row: ArkRow, references: Set<string>) {
+export function isBivoraTransaction(row: ArkRow, references: ReadonlySet<string>) {
   const ref = typeof row.requestReference === "string" ? row.requestReference : "";
   const comment = typeof row.comment === "string" ? row.comment : typeof row.trxComment === "string" ? row.trxComment : "";
   return references.has(ref) || /^bivora\b/i.test(comment);
@@ -342,3 +343,92 @@ export const transactionIdOf = (row: ArkRow) => pick(row, ["id", "trxId"]);
 export const amountOf = (row: ArkRow) => pick(row, ["amount", "trxAmount"]) ?? 0;
 export const transactionTypeOf = (row: ArkRow) => pick(row, ["transactionTypeId", "trxType", "trxTypeId"]);
 
+
+// ---------- Saving ARK money in Bivora ----------
+
+const timeOf = (row: ArkRow) =>
+  [row.transactionTime, row.trxDate, row.createdDate].find((v): v is string => typeof v === "string" && v !== "")?.slice(0, 19).replace("T", " ") ?? "";
+
+/**
+ * Keeps a copy of ARK money rows that belong to Bivora clients, so a client's page shows them.
+ * Rows already saved are left alone (ARK's transaction ID is the key).
+ */
+export async function saveArkTransactions(rows: ArkRow[], references: ReadonlySet<string> = new Set()) {
+  if (rows.length === 0) return 0;
+  const accounts = await bivoraAccounts();
+  const data = rows.flatMap((row) => {
+    const id = transactionIdOf(row);
+    const arkUserId = pick(row, ["userId", "userID"]);
+    const client = arkUserId !== undefined ? accounts.get(arkUserId) : undefined;
+    const type = transactionTypeOf(row);
+    if (id === undefined || !client || type === undefined) return [];
+    const comment = typeof row.comment === "string" ? row.comment : typeof row.trxComment === "string" ? row.trxComment : null;
+    const reference = typeof row.requestReference === "string" && row.requestReference ? row.requestReference : null;
+    return [{
+      id: String(id),
+      userId: client.id,
+      arkUserId: String(arkUserId),
+      type,
+      amount: amountOf(row),
+      comment: comment?.slice(0, 500) || null,
+      reference,
+      madeInBivora: isBivoraTransaction(row, references),
+      time: timeOf(row) || new Date().toISOString().slice(0, 19).replace("T", " "),
+    }];
+  });
+  if (data.length === 0) return 0;
+  const { count } = await db.arkTransaction.createMany({ data, skipDuplicates: true });
+  return count;
+}
+
+/** Every money transaction on one client's ARK account (newest 500), from ARK. */
+async function loadClientMoney(arkUserId: string): Promise<{ rows: ArkRow[]; references: string[] } | { error: string }> {
+  try {
+    const config = await loadArkConfig();
+    const query = new URLSearchParams({
+      fromDate: "2000-01-01 00:00:00",
+      toDate: arkDate(new Date(Date.now() + 86_400_000)),
+      withDemo: "true",
+      limit: "500",
+    });
+    const rows = rowsOf(await get(config, `/admin/public/api/v2/report/money/transaction/${encodeURIComponent(arkUserId)}?${query}`));
+    const refs = [...new Set(rows.map((r) => r.requestReference).filter((v): v is string => typeof v === "string" && v !== ""))];
+    const known = refs.length
+      ? [
+          ...(await db.fundRequest.findMany({ where: { id: { in: refs } }, select: { id: true } })),
+          ...(await db.arkMoneyTransaction.findMany({ where: { id: { in: refs } }, select: { id: true } })),
+        ]
+      : [];
+    return { rows, references: known.map((k) => k.id) };
+  } catch (e) {
+    if (e instanceof ArkError) return { error: e.message };
+    console.error("ARK client money failed", e instanceof Error ? e.message : "");
+    return { error: "ARK sent a reply Bivora couldn't read." };
+  }
+}
+
+// ---------- Cached reads ----------
+// Pages show the last good ARK reply at once and refresh it in the background: see ./cache.ts.
+
+/** One client's ARK money transactions, saved into Bivora as they arrive. */
+export async function syncClientArkMoney(arkUserId: string) {
+  const result = await arkCached("clientMoney", arkUserId, () => loadClientMoney(arkUserId));
+  if ("error" in result) return { error: result.error };
+  await saveArkTransactions(result.rows, new Set(result.references));
+  return {};
+}
+
+/** Client accounts under one office (the saved office by default). */
+export function getArkOverview(requestedNode?: number) {
+  return arkCached("overview", requestedNode ?? null, () => loadArkOverview(requestedNode));
+}
+
+/** Offices and client policies for the ARK settings dropdowns. */
+export function getArkChoices() {
+  return arkCached("choices", null, loadArkChoices);
+}
+
+/** One page of ARK money transactions. */
+export function getArkMoney(filters: MoneyFilters) {
+  return arkCached("money", filters, () => loadArkMoney(filters));
+}

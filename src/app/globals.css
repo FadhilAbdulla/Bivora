@@ -294,3 +294,12 @@ select:not([multiple]) {
 @media (pointer: coarse) {
   input:not([type="checkbox"], [type="radio"], [type="file"]), select, textarea { font-size: 16px; }
 }
+
+/* The loading bar along the top while filtered pages load (src/components/pending-nav.tsx). */
+@keyframes pending-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [role="progressbar"] > div { animation: none !important; width: 100% !important; opacity: 0.6; }
+}

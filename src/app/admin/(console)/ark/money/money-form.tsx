@@ -2,14 +2,15 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { SubmitButton } from "@/components/submit-button";
+import { ClientPicker, type PickerClient } from "@/components/client-picker";
 import { toast } from "@/components/toast";
 import { Alert, Button, Field, Input, Select } from "@/components/ui";
 import { addArkMoney, retryArkMoney, type MoneyFormState } from "./actions";
 
 const newKey = () => crypto.randomUUID().replace(/-/g, "");
 
-/** Post credit in/out, an adjustment or a bonus to a client's ARK account. */
-export function MoneyForm({ clients, types, firstKey }: { clients: { id: string; label: string }[]; types: Record<number, string>; firstKey: string }) {
+/** Post a deposit, withdrawal, credit, adjustment or bonus to a client's ARK account. */
+export function MoneyForm({ clients, types, firstKey, defaultClient }: { clients: PickerClient[]; types: Record<number, string>; firstKey: string; defaultClient?: string }) {
   // One key per transaction: a double click sends the same key, which is recorded once.
   const [key, setKey] = useState(firstKey);
   const [state, action] = useActionState(async (prev: MoneyFormState, data: FormData) => {
@@ -27,7 +28,8 @@ export function MoneyForm({ clients, types, firstKey }: { clients: { id: string;
       action={action}
       onSubmit={(e) => {
         const f = new FormData(e.currentTarget);
-        const client = clients.find((c) => c.id === f.get("userId"))?.label ?? "this client";
+        const picked = clients.find((c) => c.id === f.get("userId"));
+        const client = picked ? `${picked.name} (${picked.detail})` : "this client";
         const amount = String(f.get("amount") ?? "").trim();
         if (!confirm(`Post ${types[Number(f.get("type"))] ?? "this transaction"} of ${amount} to ${client} in ARK? They'll be emailed.`)) e.preventDefault();
       }}
@@ -41,16 +43,11 @@ export function MoneyForm({ clients, types, firstKey }: { clients: { id: string;
       ) : (
         <>
           <Field label="Client">
-            <Select name="userId" required defaultValue={v.userId ?? ""}>
-              <option value="" disabled>Choose a client…</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.label}</option>
-              ))}
-            </Select>
+            <ClientPicker name="userId" clients={clients} defaultValue={v.userId ?? defaultClient} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Type">
-              <Select name="type" required defaultValue={v.type ?? ""} onChange={(e) => setType(e.target.value)}>
+              <Select name="type" required autoFocus={Boolean(defaultClient) && !v.type} defaultValue={v.type ?? ""} onChange={(e) => setType(e.target.value)}>
                 <option value="" disabled>Choose…</option>
                 {Object.entries(types).map(([value, name]) => (
                   <option key={value} value={value}>{name}</option>

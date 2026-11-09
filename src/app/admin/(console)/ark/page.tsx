@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Alert, Card, CardHeader, EmptyState, PageHeader, StatCard, cn } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
+import { PendingArea, PendingLink } from "@/components/pending-nav";
 import { OfficePicker } from "./office-picker";
 import { accountIdOf, bivoraAccounts, bivoraClientFor, getArkOverview, isDemo, nameOf, parentIdOf, userIdOf } from "@/lib/ark/reports";
 
@@ -41,11 +42,11 @@ export default async function ArkAccountsPage({ searchParams }: PageProps<"/admi
   const officeName = node === top ? `All offices${topName ? ` · ${topName}` : ""}` : (offices.find((o) => o.id === node)?.label ?? `Office ${node}`);
 
   return (
-    <>
+    <PendingArea>
       <PageHeader
         title="ARK accounts"
         description="Every client account in ARK, opened in Bivora or directly in ARK."
-        action={<OfficePicker offices={offices} top={top} topName={topName} node={node} source={source === "all" ? undefined : source} />}
+        action={<OfficePicker key={node} offices={offices} top={top} topName={topName} node={node} source={source === "all" ? undefined : source} />}
       />
 
       <p className="mb-4 text-sm text-muted">
@@ -74,7 +75,7 @@ export default async function ArkAccountsPage({ searchParams }: PageProps<"/admi
             ["bivora", `Opened in Bivora ${fromBivora}`],
             ["ark", `Opened in ARK ${clientRows.length - fromBivora}`],
           ].map(([value, text]) => (
-            <Link
+            <PendingLink
               key={value}
               href={filterHref(value)}
               aria-current={source === value ? "page" : undefined}
@@ -84,7 +85,7 @@ export default async function ArkAccountsPage({ searchParams }: PageProps<"/admi
               )}
             >
               {text}
-            </Link>
+            </PendingLink>
           ))}
         </nav>
         {clients.error ? (
@@ -139,7 +140,7 @@ export default async function ArkAccountsPage({ searchParams }: PageProps<"/admi
           </ul>
         )}
       </Card>
-    </>
+    </PendingArea>
   );
 }
 
