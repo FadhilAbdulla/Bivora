@@ -108,7 +108,7 @@ async function TradingSummary({ arkUserId, currency }: { arkUserId: string; curr
   return (
     <TradingCard>
       <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-        {[["Balance", s.balance], ["Equity", s.equity], ["Credit", s.credit], ["Free margin", s.freeMargin]].map(([label, value]) => (
+        {[["Balance", s.balance], ["Equity", s.equity], ["Open P/L", s.profit], ["Free margin", s.freeMargin]].map(([label, value]) => (
           <div key={label as string}>
             <p className="text-xs text-muted">{label}</p>
             <p className="mt-0.5 font-mono font-medium tabular-nums">{money(value as number | undefined)}</p>

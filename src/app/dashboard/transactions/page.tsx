@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { AccountMoney } from "@/components/ark-account-money";
 import { FundRequestTable } from "@/components/fund-request-table";
 import { Card, CardHeader, EmptyState, PageHeader, Table, cn } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
@@ -16,7 +18,21 @@ export default async function TransactionsPage() {
 
   return (
     <>
-      <PageHeader title="Transactions" description="All your requests and every change to your wallet balance." />
+      <PageHeader title="Transactions" description="Money on your trading account, your requests and every change to your wallet balance." />
+      {user.arkUserId && (
+        <div className="mb-6">
+          <Suspense
+            fallback={
+              <Card aria-busy>
+                <CardHeader title="Account money" description="Loading your trading account…" />
+                <div className="space-y-3 p-4 sm:p-5">{[0, 1, 2].map((i) => <div key={i} className="h-10 animate-pulse rounded-md bg-surface-2" />)}</div>
+              </Card>
+            }
+          >
+            <AccountMoney userId={user.id} arkUserId={user.arkUserId} currency={user.currency} />
+          </Suspense>
+        </div>
+      )}
       <Card>
         <CardHeader title="Balance ledger" description="Credits and debits applied to your wallet." />
         {ledger.length === 0 ? (
