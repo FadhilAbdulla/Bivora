@@ -13,6 +13,12 @@ gateway base URL, e.g. `https://<broker>.arktrader.io/api/apigateway`.
 ```
 
 Save `data.token`; send it as `Authorization: Bearer <token>` on every other request.
+
+Sessions (`src/lib/ark/client.ts`): Bivora logs in once and reuses the token from every server
+instance; it is stored encrypted in `ArkSettings`. ARK ends a session 60 minutes after its last
+request, so Vercel Cron calls `GET /admin/public/api/v2/heartbeat` every 10 minutes through
+`/api/cron/ark-heartbeat` (needs `CRON_SECRET`). The heartbeat never logs in: if the session has
+ended, the next real request logs in again, once. Saving new ARK settings drops the session.
 Dealer-policy permissions decide which actions the token may perform.
 Responses share the envelope `{ data, message, httpStatus, errorCode, success }`.
 

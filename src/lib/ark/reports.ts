@@ -1,5 +1,6 @@
 import "server-only";
-import { ArkError, arkFetch, loadArkConfig, loginDealer, type ArkConfig } from "./client";
+import { db } from "../db";
+import { ArkError, arkRequest, ensureArkSession, loadArkConfig, type ArkConfig } from "./client";
 
 // Read-only ARK reports for the admin console: offices, clients and their financial standing.
 // ARK's docs give no response examples for these, so rows are kept as ARK sends them and the
@@ -54,22 +55,22 @@ function rowsOf(data: unknown): ArkRow[] {
   return [];
 }
 
-async function get(config: ArkConfig, token: string, path: string) {
-  const result = await arkFetch<unknown>(config, path, { method: "GET", token });
+async function get(config: ArkConfig, path: string) {
+  const result = await arkRequest<unknown>(config, path, { method: "GET" });
   if (!result.ok) throw new ArkError(result.message || `ARK returned ${result.status}.`);
   return result.data;
 }
 
 /** The highest node the dealer can see: walk up from the dealer's own account. */
-async function findTopNode(config: ArkConfig, token: string) {
+async function findTopNode(config: ArkConfig) {
   const dealer = rowsOf(
-    await get(config, token, `/admin/public/api/v2/username/${encodeURIComponent(config.dealerUsername)}`).catch(() => null),
+    await get(config, `/admin/public/api/v2/username/${encodeURIComponent(config.dealerUsername)}`).catch(() => null),
   )[0];
   let id = dealer ? userIdOf(dealer) : undefined;
   if (id === undefined) return config.parentId;
   let parent = parentIdOf(dealer);
   for (let i = 0; i < 10 && parent && parent > 0 && parent !== id; i++) {
-    const row = rowsOf(await get(config, token, `/admin/public/api/v2/user/${parent}`).catch(() => null))[0];
+    const row = rowsOf(await get(config, `/admin/public/api/v2/user/${parent}`).catch(() => null))[0];
     if (!row) break;
     id = parent;
     parent = parentIdOf(row);
@@ -78,7 +79,7 @@ async function findTopNode(config: ArkConfig, token: string) {
 }
 
 /** Every user of one type under a node. ARK pages differ by report, so pages are merged by user ID. */
-async function listUsers(config: ArkConfig, token: string, node: number, userTypeId: number) {
+async function listUsers(config: ArkConfig, node: number, userTypeId: number) {
   const byId = new Map<number, ArkRow>();
   const tomorrow = new Date(Date.now() + 86_400_000);
   let capped = false;
@@ -91,7 +92,7 @@ async function listUsers(config: ArkConfig, token: string, node: number, userTyp
       limit: String(PAGE_SIZE),
       ...(page > 0 && { offset: String(page * PAGE_SIZE) }),
     });
-    const rows = rowsOf(await get(config, token, `/admin/public/api/v2/report/users/details/${node}?${query}`));
+    const rows = rowsOf(await get(config, `/admin/public/api/v2/report/users/details/${node}?${query}`));
     const before = byId.size;
     for (const row of rows) {
       const id = userIdOf(row);
@@ -104,9 +105,9 @@ async function listUsers(config: ArkConfig, token: string, node: number, userTyp
   return { rows: [...byId.values()], capped };
 }
 
-async function financials(config: ArkConfig, token: string, node: number) {
+async function financials(config: ArkConfig, node: number) {
   const query = new URLSearchParams({ userIds: String(node), withDemo: "false" });
-  return rowsOf(await get(config, token, `/financialStandings/public/api/v2/userFinancials?${query}`));
+  return rowsOf(await get(config, `/financialStandings/public/api/v2/userFinancials?${query}`));
 }
 
 async function section<T>(work: () => Promise<T>): Promise<Section<T>> {
@@ -114,7 +115,7 @@ async function section<T>(work: () => Promise<T>): Promise<Section<T>> {
     return { data: await work() };
   } catch (e) {
     if (e instanceof ArkError) return { error: e.message };
-    console.error("ARK report failed", e);
+    console.error("ARK report failed", e instanceof Error ? e.message : "");
     return { error: "ARK sent a reply Bivora couldn't read." };
   }
 }
@@ -133,21 +134,136 @@ export type ArkOverview =
 
 export async function getArkOverview(requestedNode?: number): Promise<ArkOverview> {
   let config: ArkConfig;
-  let token: string;
+  let top: number;
   try {
     config = await loadArkConfig();
-    token = await loginDealer(config);
+    // Signs in if there is no session yet, so a login error shows once instead of per report.
+    await ensureArkSession(config);
+    top = await findTopNode(config);
   } catch (e) {
     if (e instanceof ArkError) return { error: e.message };
     throw e;
   }
-  const top = await findTopNode(config, token);
   const node = requestedNode ?? top;
   const [nodeInfo, offices, clients, standing] = await Promise.all([
-    get(config, token, `/admin/public/api/v2/user/${node}`).then((d) => rowsOf(d)[0] ?? null, () => null),
-    section(() => listUsers(config, token, node, USER_TYPE.office)),
-    section(() => listUsers(config, token, node, USER_TYPE.client)),
-    section(() => financials(config, token, node)),
+    get(config, `/admin/public/api/v2/user/${node}`).then((d) => rowsOf(d)[0] ?? null, () => null),
+    section(() => listUsers(config, node, USER_TYPE.office)),
+    section(() => listUsers(config, node, USER_TYPE.client)),
+    section(() => financials(config, node)),
   ]);
   return { top, node, nodeInfo, offices, clients, financials: standing };
 }
+
+// ---------- Where an account or transaction came from ----------
+
+export type BivoraClient = { id: string; name: string; email: string };
+
+/** ARK user ID → the Bivora client whose approval opened it. Everything else was opened in ARK. */
+export async function bivoraAccounts() {
+  const users = await db.user.findMany({
+    where: { arkUserId: { not: null } },
+    select: { id: true, arkUserId: true, firstName: true, lastName: true, email: true },
+  });
+  return new Map(users.map((u) => [Number(u.arkUserId), { id: u.id, name: `${u.firstName} ${u.lastName}`, email: u.email }]));
+}
+
+/** Matches Bivora's own fields first, then the marker Bivora puts in ARK (customData.bivoraUserId). */
+export function bivoraClientFor(row: ArkRow, accounts: Map<number, BivoraClient>) {
+  const id = userIdOf(row);
+  if (id !== undefined && accounts.has(id)) return accounts.get(id)!;
+  const custom = row.customData;
+  if (custom && typeof custom === "object" && typeof (custom as ArkRow).bivoraUserId === "string") {
+    return { id: (custom as ArkRow).bivoraUserId as string, name: nameOf(row), email: "" };
+  }
+  return null;
+}
+
+// ---------- Money transactions ----------
+
+export const TRANSACTION_TYPES: Record<number, string> = {
+  1: "Deposit",
+  2: "Withdrawal",
+  3: "Credit in",
+  4: "Credit out",
+  5: "Adjustment",
+  6: "Bonus",
+};
+const MONEY_PAGE = 200;
+
+export type MoneyFilters = {
+  node?: number;
+  /** yyyy-MM-dd, inclusive. */
+  from: string;
+  to: string;
+  type?: number;
+  demo: boolean;
+  /** ARK pages this report by transaction ID: only IDs below this one. */
+  before?: number;
+};
+
+export type ArkMoney =
+  | { error: string }
+  | {
+      top: number;
+      node: number;
+      rows: ArkRow[];
+      /** Pass as `before` for the next, older page; undefined when this is the last. */
+      older?: number;
+      clients: Section<{ rows: ArkRow[]; capped: boolean }>;
+      /** FundRequest IDs Bivora sent to ARK as requestReference. */
+      bivoraReferences: Set<string>;
+    };
+
+export async function getArkMoney(filters: MoneyFilters): Promise<ArkMoney> {
+  let config: ArkConfig;
+  let top: number;
+  try {
+    config = await loadArkConfig();
+    await ensureArkSession(config);
+    top = await findTopNode(config);
+  } catch (e) {
+    if (e instanceof ArkError) return { error: e.message };
+    throw e;
+  }
+  const node = filters.node ?? top;
+  const query = new URLSearchParams({
+    fromDate: `${filters.from} 00:00:00`,
+    toDate: `${filters.to} 23:59:59`,
+    withDemo: String(filters.demo),
+    limit: String(MONEY_PAGE),
+    ...(filters.type && { transactionTypeId: String(filters.type) }),
+    ...(filters.before && { offset: String(filters.before) }),
+  });
+  const [money, clients] = await Promise.all([
+    section(async () => rowsOf(await get(config, `/admin/public/api/v2/report/money/transaction/${node}?${query}`))),
+    section(() => listUsers(config, node, USER_TYPE.client)),
+  ]);
+  if (money.error !== undefined) return { error: money.error };
+  const rows = money.data;
+
+  const references = [...new Set(rows.map((r) => r.requestReference).filter((v): v is string => typeof v === "string" && v !== ""))];
+  const known = references.length
+    ? await db.fundRequest.findMany({ where: { id: { in: references } }, select: { id: true } })
+    : [];
+  const ids = rows.map((r) => pick(r, ["id", "trxId"])).filter((v): v is number => v !== undefined);
+  return {
+    top,
+    node,
+    rows,
+    older: rows.length === MONEY_PAGE && ids.length ? Math.min(...ids) : undefined,
+    clients,
+    bivoraReferences: new Set(known.map((k) => k.id)),
+  };
+}
+
+/** Bivora posts money with its FundRequest ID as requestReference and a comment starting "Bivora". */
+export function isBivoraTransaction(row: ArkRow, references: Set<string>) {
+  const ref = typeof row.requestReference === "string" ? row.requestReference : "";
+  const comment = typeof row.comment === "string" ? row.comment : typeof row.trxComment === "string" ? row.trxComment : "";
+  return references.has(ref) || /^bivora\b/i.test(comment);
+}
+
+export const transactionIdOf = (row: ArkRow) => pick(row, ["id", "trxId"]);
+export const amountOf = (row: ArkRow) => pick(row, ["amount", "trxAmount"]) ?? 0;
+export const transactionTypeOf = (row: ArkRow) => pick(row, ["transactionTypeId", "trxType", "trxTypeId"]);
+

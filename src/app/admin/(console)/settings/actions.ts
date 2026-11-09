@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { ARK_USER_CURRENCY_ID, ArkError, loadArkConfig, loginDealer } from "@/lib/ark/client";
+import { ARK_USER_CURRENCY_ID, ArkError, connectArk, findArkOffice, loadArkConfig } from "@/lib/ark/client";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formValues, type FormState } from "@/lib/form";
@@ -65,7 +65,15 @@ export async function saveArkSettings(_prev: FormState, formData: FormData): Pro
       where: { id: "ark" },
       // Not a setting any more, but the column stays so no migration is needed.
       create: { ...data, currencyId: ARK_USER_CURRENCY_ID, dealerPasswordEnc: dealerPasswordEnc! },
-      update: { ...data, currencyId: ARK_USER_CURRENCY_ID, dealerPasswordEnc: dealerPasswordEnc! },
+      update: {
+        ...data,
+        currencyId: ARK_USER_CURRENCY_ID,
+        dealerPasswordEnc: dealerPasswordEnc!,
+        // New details mean a new session; the old one simply expires on ARK.
+        sessionTokenEnc: null,
+        sessionUsedAt: null,
+        sessionLoginAt: null,
+      },
     }),
     db.arkSettingsChange.create({ data: { adminEmail: admin.email, fields: changed.join(", ") } }),
   ]);
@@ -76,10 +84,30 @@ export async function saveArkSettings(_prev: FormState, formData: FormData): Pro
 export async function testArkConnection(): Promise<FormState> {
   await requireAdmin();
   try {
-    await loginDealer(await loadArkConfig());
+    await connectArk(await loadArkConfig());
     return { success: "Connected. ARK accepted the dealer login." };
   } catch (e) {
     if (e instanceof ArkError) return { error: e.message };
     throw e;
   }
 }
+
+/** TEMPORARY: looks up an office by username and saves its ID as the office for new clients. */
+export async function saveOfficeFromUsername(_prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requireAdmin();
+  const username = String(formData.get("officeUsername") ?? "").trim();
+  if (!username || username.length > 200) return { error: "Enter the office username." };
+  try {
+    const officeId = await findArkOffice(await loadArkConfig(), username);
+    await db.$transaction([
+      db.arkSettings.update({ where: { id: "ark" }, data: { parentId: officeId } }),
+      db.arkSettingsChange.create({ data: { adminEmail: admin.email, fields: `Office ID (looked up from ${username})` } }),
+    ]);
+    refresh();
+    return { success: `Office ID set to ${officeId} (${username}).`, values: { officeId: String(officeId) } };
+  } catch (e) {
+    if (e instanceof ArkError) return { error: e.message };
+    throw e;
+  }
+}
+

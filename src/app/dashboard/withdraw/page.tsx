@@ -38,7 +38,17 @@ export default async function WithdrawPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,24rem)_1fr]">
         <Card>
           <CardHeader title="New withdrawal" />
-          {isKycApproved(user.kycStatus) ? (
+          {!isKycApproved(user.kycStatus) ? (
+            <div className="p-5">
+              <Alert tone="info">You can withdraw once your documents are approved.</Alert>
+            </div>
+          ) : requests.some((r) => r.status === "PENDING") ? (
+            <div className="p-5">
+              <Alert tone="info">
+                Your withdrawal is waiting for review. You can request another once it is approved, rejected or cancelled.
+              </Alert>
+            </div>
+          ) : (
             <WithdrawForm
               available={available.toFixed(2)}
               bankAccounts={bankAccounts.map((a) => ({
@@ -46,10 +56,6 @@ export default async function WithdrawPage() {
                 label: `${a.bankName} · ${maskAccountNumber(a.accountNumber)}${a.isDefault ? " (default)" : ""}`,
               }))}
             />
-          ) : (
-            <div className="p-5">
-              <Alert tone="info">You can withdraw once your documents are approved.</Alert>
-            </div>
           )}
         </Card>
         <Card className="min-w-0">

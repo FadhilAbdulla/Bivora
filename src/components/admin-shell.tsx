@@ -10,7 +10,7 @@ import { Toaster } from "./toast";
 import { Skeleton } from "./ui";
 
 const navStyles =
-  "[&_a]:text-white/75 [&_a:hover]:bg-white/5 [&_a:hover]:text-white [&_a[aria-current=page]]:bg-white/10 [&_a[aria-current=page]]:text-white";
+  "[&_a]:text-white/75 [&_a:hover]:bg-white/5 [&_a:hover]:text-white [&_a[aria-current=page]]:bg-white/10 [&_a[aria-current=page]]:text-white [&_button]:text-white/75 [&_button:hover]:bg-white/5 [&_button:hover]:text-white";
 
 function Brand() {
   return (

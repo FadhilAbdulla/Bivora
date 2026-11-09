@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const { user, error, created } = await resolveGoogleUser(profile);
     if (!user) return finish(`/login?google=${error}`);
 
-    await createSession("client", { userId: user.id });
+    await createSession("client", user);
     if (created) sendLater("Welcome", () => sendWelcomeEmail(user));
     return finish("/dashboard");
   } catch (e) {

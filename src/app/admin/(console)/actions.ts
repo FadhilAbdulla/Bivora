@@ -1,6 +1,5 @@
 "use server";
 
-import bcrypt from "bcryptjs";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
@@ -8,6 +7,9 @@ import { approveClient, resendCredentials } from "@/lib/client-approval";
 import { db } from "@/lib/db";
 import { formValues, type FormState } from "@/lib/form";
 import { FundError, adjustBalance, approveFundRequest, rejectFundRequest } from "@/lib/funds";
+import { MAX_PASSWORD, checkPassword, hashPassword, strongPassword } from "@/lib/passwords";
+import { MINUTE, TOO_MANY, hit } from "@/lib/rate-limit";
+import { createSession } from "@/lib/session";
 
 const reviewSchema = z.object({
   id: z.string().min(1),
@@ -47,7 +49,11 @@ export async function setUserStatus(formData: FormData) {
   const status = formData.get("status") === "SUSPENDED" ? "SUSPENDED" : "ACTIVE";
   if (id === admin.id) return;
 
-  await db.user.update({ where: { id }, data: { status } });
+  // Suspending ends the account's sessions straight away.
+  await db.user.update({
+    where: { id },
+    data: { status, ...(status === "SUSPENDED" && { sessionVersion: { increment: 1 } }) },
+  });
   refresh();
 }
 
@@ -112,11 +118,7 @@ export async function resendArkCredentials(_prev: FormState, formData: FormData)
   return { success: "New login details sent." };
 }
 
-const adminPassword = z
-  .string()
-  .min(12, "Password must be at least 12 characters.")
-  .regex(/[A-Za-z]/, "Password must contain a letter.")
-  .regex(/[0-9]/, "Password must contain a number.");
+const adminPassword = strongPassword(12);
 
 const newAdminSchema = z.object({
   firstName: z.string().trim().min(1, "Enter a first name.").max(60),
@@ -140,13 +142,17 @@ export async function createAdmin(_prev: FormState, formData: FormData): Promise
     };
   }
 
-  await db.user.create({ data: { ...data, role: "SUPER_ADMIN", passwordHash: await bcrypt.hash(password, 12) } });
+  await db.user.create({ data: { ...data, role: "SUPER_ADMIN", passwordHash: await hashPassword(password) } });
   refresh();
   return { success: `${data.firstName} can now sign in at /admin/login.` };
 }
 
 const adminPasswordSchema = z
-  .object({ currentPassword: z.string().min(1, "Enter your current password."), newPassword: adminPassword, confirmPassword: z.string() })
+  .object({
+    currentPassword: z.string().min(1, "Enter your current password.").max(MAX_PASSWORD, "Current password is incorrect."),
+    newPassword: adminPassword,
+    confirmPassword: z.string(),
+  })
   .refine((d) => d.newPassword === d.confirmPassword, { message: "New passwords don't match." });
 
 export async function changeAdminPassword(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -154,12 +160,14 @@ export async function changeAdminPassword(_prev: FormState, formData: FormData):
   const parsed = adminPasswordSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  if (!admin.passwordHash || !(await bcrypt.compare(parsed.data.currentPassword, admin.passwordHash))) {
+  if (!(await hit("admin-password-change", admin.id, 5, 15 * MINUTE))) return { error: TOO_MANY };
+  if (!(await checkPassword(parsed.data.currentPassword, admin.passwordHash))) {
     return { error: "Current password is incorrect." };
   }
-  await db.user.update({
+  const updated = await db.user.update({
     where: { id: admin.id },
-    data: { passwordHash: await bcrypt.hash(parsed.data.newPassword, 12) },
+    data: { passwordHash: await hashPassword(parsed.data.newPassword), sessionVersion: { increment: 1 } },
   });
-  return { success: "Password changed." };
+  await createSession("admin", updated);
+  return { success: "Password changed. Other devices have been signed out." };
 }

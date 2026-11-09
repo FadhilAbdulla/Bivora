@@ -77,6 +77,21 @@ All live prices use TradingView's free embeddable widgets (`src/components/marke
 Use TradingView's CFD-style symbols (e.g. `TVC:USOIL`, `OANDA:XCUUSD`); exchange futures such as
 `NYMEX:CL1!` are not available in the free widgets. Keep the "Market data by TradingView" attribution.
 
+## Security
+
+- Passwords: bcrypt (cost 12), 8+ characters for clients and 12+ for admins, 128 at most (`src/lib/passwords.ts`).
+  Unknown emails are checked against a dummy hash, so response times don't reveal who has an account.
+- Attempt limits (`src/lib/rate-limit.ts`, stored hashed in `RateLimit`): 5 wrong passwords lock a client email
+  for 15 minutes (admins: 30), 30 login tries per IP per 15 minutes (admins: 20), plus limits on signup,
+  password reset, password changes, the contact form and upload links.
+- Sessions carry the user's `sessionVersion`. Changing or resetting a password, suspending an account or
+  removing a password on Google linking bumps it, which ends every other session at once.
+- Balance changes lock the client's row (`SELECT … FOR UPDATE`), so simultaneous withdrawals or approvals
+  can't spend the same money twice, and a client can't open a second withdrawal while one is pending.
+- Security headers in `next.config.ts`: CSP (`frame-ancestors 'none'`, only TradingView and the R2 bucket
+  allowed), HSTS, `nosniff`, `DENY` framing, a strict referrer policy and a permissions policy (camera only).
+- Return paths after login are resolved as URLs and must stay on this site.
+
 ## Bank accounts
 
 Clients save up to 5 bank accounts in their profile (bank, holder, account number, IBAN, SWIFT,
@@ -103,6 +118,8 @@ background, repeated after a rejection. Super admins review documents from the c
   ARK settings and email are in place.
 - ARK connection details are managed at `/admin/settings` and apply straight away. The dealer password is
   encrypted with `SETTINGS_ENCRYPTION_KEY`, which must match everywhere that uses this database.
+- Bivora logs in to ARK once and reuses the session. Vercel Cron (`vercel.json`) calls ARK's heartbeat
+  every 10 minutes to keep it open; set `CRON_SECRET` in Vercel or the heartbeat is refused.
 
 Emails go through Resend (`src/lib/email.ts`): welcome, password reset and trading login details. Set
 `RESEND_API_KEY` and `EMAIL_FROM`. Without them nothing sends, and forgot password says it's unavailable.
@@ -116,6 +133,7 @@ through forgot password.
 
 - A client submits a **deposit** or **withdrawal** request; it starts as `PENDING`.
 - Withdrawals can only be requested up to the *available* balance (wallet balance minus pending withdrawals).
+- A client can have only one pending withdrawal; another can be requested once it is approved, rejected or cancelled.
 - A super admin **approves** or **rejects** it. Approval updates the wallet balance and writes a
   `LedgerEntry` in the same database transaction; a request can't be approved twice.
 - Clients can cancel their own pending requests.

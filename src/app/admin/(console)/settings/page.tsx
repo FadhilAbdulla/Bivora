@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/money";
 import { hasEncryptionKey } from "@/lib/secrets";
-import { ArkSettingsForm } from "./ark-settings-form";
+import { ArkSettingsForm, OfficeLookup } from "./ark-settings-form";
 
 export const metadata: Metadata = { title: "ARK settings" };
 
@@ -38,6 +38,12 @@ export default async function ArkSettingsPage() {
           <CardHeader title="Connection" description="Get these details from your broker." />
           <ArkSettingsForm saved={saved} />
         </Card>
+        {settings && (
+          <Card className="xl:col-start-1">
+            <CardHeader title="Find office ID" description="Looks the office up in ARK and saves its ID as the Office ID above." />
+            <OfficeLookup />
+          </Card>
+        )}
         <Card>
           <CardHeader title="Change history" description="Who changed what. Values are not recorded." />
           {changes.length === 0 ? (

@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { formValues, type FormState } from "@/lib/form";
+import { MINUTE, TOO_MANY, clientIp, hit } from "@/lib/rate-limit";
 
 const schema = z.object({
   name: z.string().trim().min(2, "Enter your name.").max(100),
@@ -19,6 +20,7 @@ export async function sendContactMessage(_prev: FormState, formData: FormData): 
   const parsed = schema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message, values: formValues(formData) };
 
+  if (!(await hit("contact-ip", await clientIp(), 5, 60 * MINUTE))) return { error: TOO_MANY, values: formValues(formData) };
   await db.contactMessage.create({ data: parsed.data });
   return { success: THANKS };
 }

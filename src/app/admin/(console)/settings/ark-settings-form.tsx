@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState, useTransition } from "react";
 import { SubmitButton } from "@/components/submit-button";
 import { toast } from "@/components/toast";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import type { FormState } from "@/lib/form";
-import { saveArkSettings, testArkConnection } from "./actions";
+import { saveArkSettings, saveOfficeFromUsername, testArkConnection } from "./actions";
 
 export type ArkFormValues = {
   apiUrl: string;
@@ -78,3 +79,33 @@ export function ArkSettingsForm({ saved }: { saved: ArkFormValues | null }) {
     </form>
   );
 }
+
+/** TEMPORARY: sets the office ID from the office's ARK username. Remove once the ID is set. */
+export function OfficeLookup() {
+  const [state, action] = useActionState(async (prev: FormState, data: FormData) => {
+    const result = await saveOfficeFromUsername(prev, data);
+    if (result?.success) toast(result.success);
+    return result;
+  }, null);
+
+  return (
+    <form action={action} className="space-y-3 p-4 sm:p-5">
+      {state?.error && <Alert tone="error">{state.error}</Alert>}
+      {state?.success && (
+        <Alert tone="success">
+          {state.success}{" "}
+          {state.values?.officeId && (
+            <Link href={`/admin/ark?node=${state.values.officeId}`} className="font-medium underline">
+              See this office&apos;s users
+            </Link>
+          )}
+        </Alert>
+      )}
+      <Field label="Office username in ARK">
+        <Input name="officeUsername" required autoComplete="off" defaultValue="RealAppUser" />
+      </Field>
+      <SubmitButton pendingText="Looking up…">Find and save office ID</SubmitButton>
+    </form>
+  );
+}
+

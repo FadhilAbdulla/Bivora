@@ -8,10 +8,20 @@ export class FundError extends Error {}
 
 export type FundRequestType = "DEPOSIT" | "WITHDRAWAL";
 
-export async function getAvailableBalance(userId: string) {
+type Client = Prisma.TransactionClient | typeof db;
+
+/**
+ * Locks the client's row until the transaction ends. Every balance check and change goes through
+ * this, so two requests at the same moment run one after the other instead of both passing a check.
+ */
+async function lockClient(tx: Prisma.TransactionClient, userId: string) {
+  await tx.$queryRaw`SELECT 1 FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+}
+
+export async function getAvailableBalance(userId: string, client: Client = db) {
   const [user, pending] = await Promise.all([
-    db.user.findUniqueOrThrow({ where: { id: userId }, select: { balance: true } }),
-    db.fundRequest.aggregate({
+    client.user.findUniqueOrThrow({ where: { id: userId }, select: { balance: true } }),
+    client.fundRequest.aggregate({
       where: { userId, type: "WITHDRAWAL", status: "PENDING" },
       _sum: { amount: true },
     }),
@@ -35,23 +45,30 @@ export async function createFundRequest(input: {
 }) {
   const amount = new Prisma.Decimal(input.amount);
 
-  if (input.type === "WITHDRAWAL") {
-    const { available } = await getAvailableBalance(input.userId);
-    if (available.lessThan(amount)) {
-      throw new FundError("Amount exceeds your available balance.");
+  return db.$transaction(async (tx) => {
+    if (input.type === "WITHDRAWAL") {
+      await lockClient(tx, input.userId);
+      // One withdrawal at a time: a new one waits until the open one is approved, rejected or cancelled.
+      const open = await tx.fundRequest.count({ where: { userId: input.userId, type: "WITHDRAWAL", status: "PENDING" } });
+      if (open > 0) {
+        throw new FundError("You already have a withdrawal waiting for review. You can request another once it is approved, rejected or cancelled.");
+      }
+      const { available } = await getAvailableBalance(input.userId, tx);
+      if (available.lessThan(amount)) {
+        throw new FundError("Amount exceeds your available balance.");
+      }
     }
-  }
-
-  return db.fundRequest.create({
-    data: {
-      userId: input.userId,
-      type: input.type,
-      amount,
-      method: input.method,
-      reference: input.reference || null,
-      payoutDetails: input.payoutDetails || null,
-      userNote: input.userNote || null,
-    },
+    return tx.fundRequest.create({
+      data: {
+        userId: input.userId,
+        type: input.type,
+        amount,
+        method: input.method,
+        reference: input.reference || null,
+        payoutDetails: input.payoutDetails || null,
+        userNote: input.userNote || null,
+      },
+    });
   });
 }
 
@@ -69,6 +86,9 @@ export async function approveFundRequest(
   adminNote?: string,
 ) {
   await db.$transaction(async (tx) => {
+    const owner = await tx.fundRequest.findUnique({ where: { id: requestId }, select: { userId: true } });
+    if (!owner) throw new FundError("This request has already been reviewed.");
+    await lockClient(tx, owner.userId);
     const request = await tx.fundRequest.findUnique({
       where: { id: requestId },
       include: { user: true },
@@ -151,6 +171,7 @@ export async function adjustBalance(input: {
 }) {
   const delta = new Prisma.Decimal(input.amount);
   await db.$transaction(async (tx) => {
+    await lockClient(tx, input.userId);
     const current = await tx.user.findUniqueOrThrow({ where: { id: input.userId } });
     if (current.balance.plus(delta).isNegative()) {
       throw new FundError("Adjustment would make the balance negative.");

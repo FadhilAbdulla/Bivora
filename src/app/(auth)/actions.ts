@@ -1,6 +1,5 @@
 "use server";
 
-import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -10,12 +9,10 @@ import { missingEmailSettings, sendLater, sendPasswordResetEmail, sendWelcomeEma
 import { RESET_COOLDOWN_MS, matchesPassword, readResetToken, signResetToken } from "@/lib/password-reset";
 import { createSession, deleteSession } from "@/lib/session";
 import { formValues, type FormState } from "@/lib/form";
+import { MAX_PASSWORD, checkPassword, hashPassword, strongPassword } from "@/lib/passwords";
+import { MINUTE, TOO_MANY, clientIp, hit, isLimited, reset } from "@/lib/rate-limit";
 
-const newPassword = z
-  .string()
-  .min(8, "Password must be at least 8 characters.")
-  .regex(/[A-Za-z]/, "Password must contain a letter.")
-  .regex(/[0-9]/, "Password must contain a number.");
+const newPassword = strongPassword();
 
 const signupSchema = z.object({
   firstName: z.string().trim().min(1, "Enter your first name.").max(60),
@@ -30,6 +27,8 @@ export async function signup(_prev: FormState, formData: FormData): Promise<Form
   const parsed = signupSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message, values };
 
+  if (!(await hit("signup-ip", await clientIp(), 10, 60 * MINUTE))) return { error: TOO_MANY, values };
+
   const { password, ...data } = parsed.data;
   const existing = await db.user.findUnique({ where: { email: data.email } });
   if (existing) return { error: "An account with this email already exists.", values };
@@ -37,18 +36,18 @@ export async function signup(_prev: FormState, formData: FormData): Promise<Form
   const user = await db.user.create({
     data: {
       ...data,
-      passwordHash: await bcrypt.hash(password, 12),
+      passwordHash: await hashPassword(password),
     },
   });
 
-  await createSession("client", { userId: user.id });
+  await createSession("client", user);
   sendLater("Welcome", () => sendWelcomeEmail(user));
   redirect("/onboarding");
 }
 
 const loginSchema = z.object({
   email: z.email("Enter a valid email address.").trim().toLowerCase(),
-  password: z.string().min(1, "Enter your password."),
+  password: z.string().min(1, "Enter your password.").max(MAX_PASSWORD, "Incorrect email or password."),
 });
 
 // The proxy sends unauthenticated visitors to /login?next=<path>; the form
@@ -57,7 +56,11 @@ async function returnPath() {
   const referer = (await headers()).get("referer");
   if (!referer) return null;
   const next = new URL(referer).searchParams.get("next");
-  return next?.startsWith("/") && !next.startsWith("//") ? next : null;
+  if (!next?.startsWith("/")) return null;
+  // Resolve it the way a browser would, so "/\\evil.com" and similar can't leave the site.
+  const base = "https://bivora.invalid";
+  const url = new URL(next, base);
+  return url.origin === base ? `${url.pathname}${url.search}` : null;
 }
 
 export async function login(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -65,21 +68,31 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message, values };
 
-  const user = await db.user.findUnique({ where: { email: parsed.data.email } });
+  const { email, password } = parsed.data;
+  // 5 wrong passwords lock an email for 15 minutes; one address can't try more than 30 times.
+  if (!(await hit("login-ip", await clientIp(), 30, 15 * MINUTE)) || (await isLimited("login-email", email, 5, 15 * MINUTE))) {
+    return { error: TOO_MANY, values };
+  }
+
+  const user = await db.user.findUnique({ where: { email } });
   if (user?.role === "USER" && !user.passwordHash) {
     return {
       error: "You signed up with Google and haven't saved a password. Use Forgot password to set one, or sign in with Google.",
       values,
     };
   }
-  const valid = user?.passwordHash && (await bcrypt.compare(parsed.data.password, user.passwordHash));
+  const valid = await checkPassword(password, user?.passwordHash);
   // Super admins sign in through /admin/login only.
-  if (!user || !valid || user.role !== "USER") return { error: "Incorrect email or password.", values };
+  if (!user || !valid || user.role !== "USER") {
+    await hit("login-email", email, 5, 15 * MINUTE);
+    return { error: "Incorrect email or password.", values };
+  }
   if (user.status !== "ACTIVE") {
     return { error: "Your account is suspended. Please contact support.", values };
   }
 
-  await createSession("client", { userId: user.id });
+  await reset("login-email", email);
+  await createSession("client", user);
   redirect((await returnPath()) ?? "/dashboard");
 }
 
@@ -90,6 +103,7 @@ export async function requestPasswordReset(_prev: FormState, formData: FormData)
   const parsed = z.email("Enter a valid email address.").trim().toLowerCase().safeParse(formData.get("email"));
   if (!parsed.success) return { error: parsed.error.issues[0].message, values };
   if (missingEmailSettings().length) return { error: NOT_SENT, values };
+  if (!(await hit("reset-request-ip", await clientIp(), 10, 60 * MINUTE))) return { error: TOO_MANY, values };
 
   // One email per account every couple of minutes, so nobody can flood someone's inbox.
   const user = await db.user.findFirst({ where: { email: parsed.data, role: "USER", status: "ACTIVE" } });
@@ -119,17 +133,20 @@ const LINK_INVALID = "This link has expired or has already been used. Please req
 export async function resetPassword(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = resetSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!(await hit("reset-ip", await clientIp(), 20, 60 * MINUTE))) return { error: TOO_MANY };
 
   const token = await readResetToken(parsed.data.token);
   const user = token && (await db.user.findFirst({ where: { id: token.userId, role: "USER", status: "ACTIVE" } }));
   if (!token || !user || !matchesPassword(user.passwordHash, token.fp)) return { error: LINK_INVALID };
 
   // Only changes the password the link was issued for, so a link can't be used twice at once.
+  // A new session version signs out every device that was logged in.
   const { count } = await db.user.updateMany({
     where: { id: user.id, passwordHash: user.passwordHash },
-    data: { passwordHash: await bcrypt.hash(parsed.data.password, 12) },
+    data: { passwordHash: await hashPassword(parsed.data.password), sessionVersion: { increment: 1 } },
   });
   if (count === 0) return { error: LINK_INVALID };
+  await reset("login-email", user.email);
   redirect("/login?reset=1");
 }
 

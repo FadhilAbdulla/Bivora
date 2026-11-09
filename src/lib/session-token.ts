@@ -10,7 +10,8 @@ export const SESSIONS = {
   admin: { cookie: "bivora_admin_session", ttlSeconds: 60 * 60 * 8 },
 } as const satisfies Record<SessionKind, { cookie: string; ttlSeconds: number }>;
 
-export type SessionPayload = { userId: string };
+/** `v` is the user's sessionVersion when signed in; a newer version ends this session. */
+export type SessionPayload = { userId: string; v: number };
 
 export function sessionKey() {
   const secret = process.env.SESSION_SECRET;

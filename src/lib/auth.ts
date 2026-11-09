@@ -15,7 +15,10 @@ async function resolve(kind: SessionKind) {
   if (!session) return { user: null, hasSession: false };
 
   const user = await db.user.findUnique({ where: { id: session.userId } });
-  if (!user || user.status !== "ACTIVE" || user.role !== ROLE_FOR[kind]) return { user: null, hasSession: true };
+  // Sessions signed before a password change or suspension carry an older version.
+  if (!user || user.status !== "ACTIVE" || user.role !== ROLE_FOR[kind] || (session.v ?? 0) !== user.sessionVersion) {
+    return { user: null, hasSession: true };
+  }
   return { user, hasSession: true };
 }
 

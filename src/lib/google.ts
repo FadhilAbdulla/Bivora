@@ -67,7 +67,11 @@ export async function resolveGoogleUser(profile: GoogleProfile) {
   // Google has now proved who owns it, so an unverified account loses its password when linked.
   const linked = await db.user.update({
     where: { id: user.id },
-    data: { googleId: profile.sub, ...(!isKycApproved(user.kycStatus) && { passwordHash: null }) },
+    // Removing the password also ends any session made with it.
+    data: {
+      googleId: profile.sub,
+      ...(!isKycApproved(user.kycStatus) && { passwordHash: null, sessionVersion: { increment: 1 } }),
+    },
   });
   return { user: linked };
 }

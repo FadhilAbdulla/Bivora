@@ -1,6 +1,5 @@
 "use server";
 
-import bcrypt from "bcryptjs";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
@@ -16,6 +15,9 @@ import { db } from "@/lib/db";
 import { formValues, type FormState } from "@/lib/form";
 import { FundError, cancelFundRequest, createFundRequest } from "@/lib/funds";
 import { isKycApproved } from "@/lib/kyc";
+import { MAX_PASSWORD, checkPassword, hashPassword, strongPassword } from "@/lib/passwords";
+import { MINUTE, TOO_MANY, hit } from "@/lib/rate-limit";
+import { createSession } from "@/lib/session";
 
 const amount = (min: number) =>
   z.coerce
@@ -124,12 +126,8 @@ export async function updateProfile(_prev: FormState, formData: FormData): Promi
 
 const passwordSchema = z
   .object({
-    currentPassword: z.string().min(1, "Enter your current password."),
-    newPassword: z
-      .string()
-      .min(8, "New password must be at least 8 characters.")
-      .regex(/[A-Za-z]/, "New password must contain a letter.")
-      .regex(/[0-9]/, "New password must contain a number."),
+    currentPassword: z.string().min(1, "Enter your current password.").max(MAX_PASSWORD, "Current password is incorrect."),
+    newPassword: strongPassword(8, "New password"),
     confirmPassword: z.string(),
   })
   .refine((d) => d.newPassword === d.confirmPassword, { message: "New passwords don't match." });
@@ -139,14 +137,17 @@ export async function changePassword(_prev: FormState, formData: FormData): Prom
   const parsed = passwordSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  if (!user.passwordHash || !(await bcrypt.compare(parsed.data.currentPassword, user.passwordHash))) {
+  if (!(await hit("password-change", user.id, 5, 15 * MINUTE))) return { error: TOO_MANY };
+  if (!(await checkPassword(parsed.data.currentPassword, user.passwordHash))) {
     return { error: "Current password is incorrect." };
   }
-  await db.user.update({
+  // Signs out every other device; this one gets a fresh session.
+  const updated = await db.user.update({
     where: { id: user.id },
-    data: { passwordHash: await bcrypt.hash(parsed.data.newPassword, 12) },
+    data: { passwordHash: await hashPassword(parsed.data.newPassword), sessionVersion: { increment: 1 } },
   });
-  return { success: "Password changed." };
+  await createSession("client", updated);
+  return { success: "Password changed. Other devices have been signed out." };
 }
 
 const bankAccountSchema = z

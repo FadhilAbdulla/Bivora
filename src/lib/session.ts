@@ -2,7 +2,8 @@ import "server-only";
 import { cookies } from "next/headers";
 import { SESSIONS, signSession, verifySession, type SessionKind, type SessionPayload } from "./session-token";
 
-export async function createSession(kind: SessionKind, payload: SessionPayload) {
+export async function createSession(kind: SessionKind, user: { id: string; sessionVersion: number }) {
+  const payload: SessionPayload = { userId: user.id, v: user.sessionVersion };
   const { cookie, ttlSeconds } = SESSIONS[kind];
   (await cookies()).set(cookie, await signSession(kind, payload), {
     httpOnly: true,
