@@ -90,7 +90,7 @@ export default async function DashboardPage() {
               </ButtonLink>
             }
           />
-          <FundRequestTable requests={recent} compact emptyText="No deposits or withdrawals yet." />
+          <FundRequestTable requests={recent} compact emptyText="No deposit or withdrawal requests yet." />
         </Card>
         <Card className="self-start overflow-hidden">
           <CardHeader title="Markets" />          <MarketOverview className="h-[420px] px-1" />

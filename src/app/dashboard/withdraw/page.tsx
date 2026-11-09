@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { CancelRequestButton } from "@/components/cancel-request-button";
 import { FundRequestTable } from "@/components/fund-request-table";
 import { Alert, Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
@@ -59,10 +60,13 @@ export default async function WithdrawPage() {
           )}
         </Card>
         <Card className="min-w-0">
-          <CardHeader title="Withdrawal history" />
+          <CardHeader
+            title="Withdrawal requests"
+            description={<>Withdrawals you&apos;ve requested here and their status. Money already on your trading account is under <Link href="/dashboard/transactions" className="font-medium text-brand hover:underline">Transactions</Link>.</>}
+          />
           <FundRequestTable
             requests={requests}
-            emptyText="No withdrawals yet."
+            emptyText="No withdrawal requests yet."
             actions={(r) => (r.status === "PENDING" ? <CancelRequestButton id={r.id} /> : null)}
           />
         </Card>
