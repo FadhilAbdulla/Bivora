@@ -3,7 +3,6 @@
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { ARK_USER_CURRENCY_ID, ArkError, connectArk, loadArkConfig } from "@/lib/ark/client";
-import { findArkOffice } from "@/lib/ark/reports";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formValues, type FormState } from "@/lib/form";
@@ -18,9 +17,9 @@ const schema = z.object({
   companyName: z.string().trim().min(1, "Enter the company name.").max(200),
   dealerUsername: z.string().trim().min(1, "Enter the dealer username.").max(200),
   dealerPassword: z.string().max(500),
-  parentId: positiveId("office ID"),
-  genericPolicyId: positiveId("generic policy ID"),
-  currenciesPolicyId: positiveId("script policy ID"),
+  parentId: positiveId("office"),
+  genericPolicyId: positiveId("generic policy"),
+  currenciesPolicyId: positiveId("script policy"),
   tradingUrl: httpsUrl("trading login URL"),
 });
 
@@ -92,23 +91,3 @@ export async function testArkConnection(): Promise<FormState> {
     throw e;
   }
 }
-
-/** TEMPORARY: looks up an office by username and saves its ID as the office for new clients. */
-export async function saveOfficeFromUsername(_prev: FormState, formData: FormData): Promise<FormState> {
-  const admin = await requireAdmin();
-  const username = String(formData.get("officeUsername") ?? "").trim();
-  if (!username || username.length > 200) return { error: "Enter the office username." };
-  try {
-    const { officeId, note } = await findArkOffice(username);
-    await db.$transaction([
-      db.arkSettings.update({ where: { id: "ark" }, data: { parentId: officeId } }),
-      db.arkSettingsChange.create({ data: { adminEmail: admin.email, fields: `Office ID (looked up from ${username})` } }),
-    ]);
-    refresh();
-    return { success: `Office ID set to ${officeId} (${username}).${note}`, values: { officeId: String(officeId) } };
-  } catch (e) {
-    if (e instanceof ArkError) return { error: e.message };
-    throw e;
-  }
-}
-

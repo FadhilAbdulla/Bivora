@@ -4,7 +4,8 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/money";
 import { hasEncryptionKey } from "@/lib/secrets";
-import { ArkSettingsForm, OfficeLookup } from "./ark-settings-form";
+import { getArkChoices } from "@/lib/ark/reports";
+import { ArkSettingsForm } from "./ark-settings-form";
 
 export const metadata: Metadata = { title: "ARK settings" };
 
@@ -14,6 +15,8 @@ export default async function ArkSettingsPage() {
     db.arkSettings.findUnique({ where: { id: "ark" } }),
     db.arkSettingsChange.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
   ]);
+  // Lists for the office and policy dropdowns, once there is a connection to ask.
+  const choices = settings ? await getArkChoices() : null;
   // The password stays on the server: only the fields the form may show are passed to it.
   const saved = settings && {
     apiUrl: settings.apiUrl,
@@ -36,14 +39,8 @@ export default async function ArkSettingsPage() {
       <div className="grid items-start gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <Card>
           <CardHeader title="Connection" description="Get these details from your broker." />
-          <ArkSettingsForm saved={saved} />
+          <ArkSettingsForm saved={saved} choices={choices} />
         </Card>
-        {settings && (
-          <Card className="xl:col-start-1">
-            <CardHeader title="Find office ID" description="Looks the office up in ARK and saves its ID as the Office ID above." />
-            <OfficeLookup />
-          </Card>
-        )}
         <Card>
           <CardHeader title="Change history" description="Who changed what. Values are not recorded." />
           {changes.length === 0 ? (

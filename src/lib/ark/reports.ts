@@ -160,84 +160,66 @@ export async function getArkOverview(requestedNode?: number): Promise<ArkOvervie
   return { top, node, nodeInfo, offices, clients, financials: standing };
 }
 
-// ---------- TEMPORARY: find the office ID from its username ----------
+// ---------- Choices for ARK settings ----------
 
-const usernameOf = (row: ArkRow) =>
-  [row.username, row.userName, row.login].find((v): v is string => typeof v === "string") ?? "";
+export type ArkChoice = { id: number; label: string; group?: string };
+export type ArkChoices = {
+  offices: Section<ArkChoice[]>;
+  genericPolicies: Section<ArkChoice[]>;
+  scriptPolicies: Section<ArkChoice[]>;
+};
 
-/** ARK sends the type as a number, a numeric string or a label. */
-function typeOf(row: ArkRow) {
-  const n = userTypeOf(row);
-  if (n !== undefined) return n;
-  const label = [row.userType, row.userTypeName, row.type].find((v): v is string => typeof v === "string") ?? "";
-  if (/office/i.test(label)) return 2;
-  if (/client/i.test(label)) return 1;
-  if (/dealer/i.test(label)) return 3;
-  if (/department/i.test(label)) return 4;
-  return undefined;
+const textOf = (row: ArkRow, keys: string[]) =>
+  keys.map((k) => row[k]).find((v): v is string => typeof v === "string" && v.trim() !== "")?.trim() ?? "";
+
+/** Client policies ARK lists for the dealer. `kind` is ARK's path: generic or currency (script). */
+async function clientPolicies(config: ArkConfig, kind: "generic" | "currency") {
+  const rows = rowsOf(await get(config, `/admin/public/api/v2/client/${kind}/policy/${USER_TYPE.client}`));
+  // Script policies come in groups (policyTypeId 2) that hold the real policies.
+  const groups = new Map(rows.filter((r) => pick(r, ["policyTypeId"]) === 2).map((r) => [pick(r, ["id"]), textOf(r, ["policyName", "name"])]));
+  return rows
+    .filter((r) => pick(r, ["id"]) !== undefined && pick(r, ["policyTypeId"]) !== 2)
+    .map((r) => {
+      const id = pick(r, ["id"])!;
+      const parent = pick(r, ["parentId"]);
+      return { id, label: textOf(r, ["policyName", "name"]) || `Policy ${id}`, group: parent ? groups.get(parent) || undefined : undefined };
+    })
+    .sort((a, b) => (a.group ?? "").localeCompare(b.group ?? "") || a.label.localeCompare(b.label));
 }
 
-const TYPE_NAMES: Record<number, string> = { 1: "a client", 2: "an office", 3: "a dealer", 4: "a department" };
-
-/**
- * The office ID for an ARK username. Tries ARK's username lookup, then searches every office under the
- * dealer's top node (some dealer policies refuse the direct lookup). A dealer or department name resolves
- * to the office above it.
- */
-export async function findArkOffice(username: string): Promise<{ officeId: number; note: string }> {
-  const config = await loadArkConfig();
-  await ensureArkSession(config);
-  const wanted = username.trim().toLowerCase();
-  const matches = (row: ArkRow) => usernameOf(row).toLowerCase() === wanted;
-
-  const direct = await arkRequest<unknown>(config, `/admin/public/api/v2/username/${encodeURIComponent(username.trim())}`, { method: "GET" });
-  const directRows = direct.ok ? rowsOf(direct.data).filter((r) => userIdOf(r) !== undefined) : [];
-  let user: ArkRow | undefined = directRows.find(matches) ?? (directRows.length === 1 ? directRows[0] : undefined);
-
-  let searchError = "";
-  if (!user) {
-    try {
-      // Search the whole tree, not just the saved office: from the highest node the dealer can reach,
-      // then ARK's root node 1 in case the dealer can see more from there.
+/** Every office the dealer can see and the client policies, for the settings dropdowns. */
+export async function getArkChoices(): Promise<ArkChoices | { error: string }> {
+  let config: ArkConfig;
+  try {
+    config = await loadArkConfig();
+    await ensureArkSession(config);
+  } catch (e) {
+    if (e instanceof ArkError) return { error: e.message };
+    throw e;
+  }
+  const [offices, genericPolicies, scriptPolicies] = await Promise.all([
+    section(async () => {
       const top = await findTopNode(config);
-      for (const root of [...new Set([top, 1])]) {
-        const self = rowsOf(await get(config, `/admin/public/api/v2/user/${root}`).catch(() => null))[0];
-        if (self && matches(self)) { user = self; break; }
-        const offices = await listUsers(config, root, USER_TYPE.office).catch(() => null);
-        user = offices?.rows.find(matches);
-        if (user) break;
-      }
-    } catch (e) {
-      searchError = e instanceof ArkError ? e.message : "the office search failed";
-    }
-  }
-
-  if (!user) {
-    const said = direct.ok ? "" : ` ARK said: "${direct.message || `error ${direct.status}`}".`;
-    throw new ArkError(
-      `No ARK office with the username "${username}" was found.${said}${searchError ? ` Office search: ${searchError}.` : ""} Check the spelling, or ask the broker whether this dealer can see that office.`,
-    );
-  }
-
-  let type = typeOf(user);
-  let id = userIdOf(user)!;
-  if (type === 1) throw new ArkError(`"${username}" is a client account in ARK (user ${id}), not an office.`);
-  let note = "";
-  if (type === 3 || type === 4) {
-    // Walk up to the nearest office.
-    let row: ArkRow | undefined = user;
-    for (let i = 0; i < 10 && row && type !== 2; i++) {
-      const parent = parentIdOf(row);
-      if (!parent || parent <= 0 || parent === id) break;
-      row = rowsOf(await get(config, `/admin/public/api/v2/user/${parent}`).catch(() => null))[0];
-      if (!row) break;
-      id = parent;
-      type = typeOf(row);
-    }
-    if (type !== 2) throw new ArkError(`"${username}" is ${TYPE_NAMES[typeOf(user)!]} in ARK and no office was found above it.`);
-    note = ` "${username}" is ${TYPE_NAMES[typeOf(user)!]}; this is the office it belongs to${row && nameOf(row) ? ` (${nameOf(row)})` : ""}.`;
-  }
-  return { officeId: id, note };
+      const [list, self] = await Promise.all([
+        listUsers(config, top, USER_TYPE.office),
+        get(config, `/admin/public/api/v2/user/${top}`).then((d) => rowsOf(d)[0] ?? null, () => null),
+      ]);
+      const rows = [...list.rows];
+      // The top node is an office too when the dealer sits directly under it.
+      if (self && userTypeOf(self) === USER_TYPE.office && !rows.some((r) => userIdOf(r) === top)) rows.unshift(self);
+      return rows
+        .map((r) => {
+          const id = userIdOf(r)!;
+          const name = nameOf(r);
+          const username = textOf(r, ["username", "userName"]);
+          return { id, label: [name, username && username !== name ? username : ""].filter(Boolean).join(" · ") || `Office ${id}` };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label));
+    }),
+    section(() => clientPolicies(config, "generic")),
+    section(() => clientPolicies(config, "currency")),
+  ]);
+  return { offices, genericPolicies, scriptPolicies };
 }
 
 // ---------- Where an account or transaction came from ----------

@@ -41,6 +41,9 @@ Responses share the envelope `{ data, message, httpStatus, errorCode, success }`
 | Top node | `GET /admin/public/api/v2/username/{dealerUsername}`, then `GET /admin/public/api/v2/user/{parentId}` up the tree until ARK refuses |
 | Offices / clients | `GET /admin/public/api/v2/report/users/details/{nodeId}?fromDate&toDate&withDemo=true&userTypeId=2` (offices) or `=1` (clients), `limit=500`, pages merged by user ID |
 | Trading financial report | `GET /financialStandings/public/api/v2/userFinancials?userIds={nodeId}&withDemo=false` (an office node returns all its clients) |
+| Settings: office dropdown | The offices report above, from the top node |
+| Settings: generic policies | `GET /admin/public/api/v2/client/generic/policy/1` → `[{ id, policyName }]` |
+| Settings: script policies | `GET /admin/public/api/v2/client/currency/policy/1` → `[{ id, policyName, policyTypeId, parentId }]`; `policyTypeId` 2 is a group, listed only as a heading |
 
 `userTypeId`: 1 Client · 2 Office · 3 Dealer · 4 Department. The docs have no response examples for
 these, so the page shows the financial report's columns exactly as ARK returns them.

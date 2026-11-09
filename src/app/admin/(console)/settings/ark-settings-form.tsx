@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useState, useTransition } from "react";
 import { SubmitButton } from "@/components/submit-button";
 import { toast } from "@/components/toast";
-import { Alert, Button, Field, Input } from "@/components/ui";
+import { Alert, Button, Field, Input, Select } from "@/components/ui";
+import type { ArkChoice } from "@/lib/ark/reports";
 import type { FormState } from "@/lib/form";
-import { saveArkSettings, saveOfficeFromUsername, testArkConnection } from "./actions";
+import { saveArkSettings, testArkConnection } from "./actions";
 
 export type ArkFormValues = {
   apiUrl: string;
@@ -18,7 +18,11 @@ export type ArkFormValues = {
   tradingUrl: string;
 };
 
-export function ArkSettingsForm({ saved }: { saved: ArkFormValues | null }) {
+/** A list from ARK, or why it couldn't be loaded (the field then takes a typed ID). */
+export type ChoiceList = { data: ArkChoice[]; error?: undefined } | { data?: undefined; error: string };
+export type ArkFormChoices = { offices: ChoiceList; genericPolicies: ChoiceList; scriptPolicies: ChoiceList } | { error: string } | null;
+
+export function ArkSettingsForm({ saved, choices }: { saved: ArkFormValues | null; choices: ArkFormChoices }) {
   const [state, action] = useActionState(async (prev: FormState, data: FormData) => {
     const result = await saveArkSettings(prev, data);
     if (result?.success) toast(result.success);
@@ -45,16 +49,34 @@ export function ArkSettingsForm({ saved }: { saved: ArkFormValues | null }) {
           <Input name="dealerPassword" type="password" required={!saved} autoComplete="new-password" placeholder={saved ? "••••••••" : undefined} />
         </Field>
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Field label="Office ID" hint="Where new clients are created. See ARK accounts for every office ID.">
-          <Input name="parentId" inputMode="numeric" required autoComplete="off" defaultValue={v.parentId} />
-        </Field>
-        <Field label="Generic policy ID">
-          <Input name="genericPolicyId" inputMode="numeric" required autoComplete="off" defaultValue={v.genericPolicyId} />
-        </Field>
-        <Field label="Script policy ID">
-          <Input name="currenciesPolicyId" inputMode="numeric" required autoComplete="off" defaultValue={v.currenciesPolicyId} />
-        </Field>
+      {!saved ? (
+        <Alert tone="info">Save the connection first. The office and policies can then be picked from ARK&apos;s lists.</Alert>
+      ) : choices && "error" in choices ? (
+        <Alert tone="error">Couldn&apos;t load the lists from ARK: {choices.error} Enter the IDs instead, or fix the connection and reload.</Alert>
+      ) : null}
+      <ChoiceField
+        name="parentId"
+        label="Office"
+        idLabel="Office ID"
+        hint="Where new clients are created."
+        value={v.parentId}
+        list={choices && !("error" in choices) ? choices.offices : null}
+      />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <ChoiceField
+          name="genericPolicyId"
+          label="Generic policy"
+          idLabel="Generic policy ID"
+          value={v.genericPolicyId}
+          list={choices && !("error" in choices) ? choices.genericPolicies : null}
+        />
+        <ChoiceField
+          name="currenciesPolicyId"
+          label="Script policy"
+          idLabel="Script policy ID"
+          value={v.currenciesPolicyId}
+          list={choices && !("error" in choices) ? choices.scriptPolicies : null}
+        />
       </div>
       <Field label="Trading login URL" hint="Where clients log in to trade. It goes in their login email.">
         <Input name="tradingUrl" type="url" required autoComplete="off" defaultValue={v.tradingUrl} />
@@ -80,32 +102,40 @@ export function ArkSettingsForm({ saved }: { saved: ArkFormValues | null }) {
   );
 }
 
-/** TEMPORARY: sets the office ID from the office's ARK username. Remove once the ID is set. */
-export function OfficeLookup() {
-  const [state, action] = useActionState(async (prev: FormState, data: FormData) => {
-    const result = await saveOfficeFromUsername(prev, data);
-    if (result?.success) toast(result.success);
-    return result;
-  }, null);
-
-  return (
-    <form action={action} className="space-y-3 p-4 sm:p-5">
-      {state?.error && <Alert tone="error">{state.error}</Alert>}
-      {state?.success && (
-        <Alert tone="success">
-          {state.success}{" "}
-          {state.values?.officeId && (
-            <Link href={`/admin/ark?node=${state.values.officeId}`} className="font-medium underline">
-              See this office&apos;s users
-            </Link>
-          )}
-        </Alert>
-      )}
-      <Field label="Office username in ARK">
-        <Input name="officeUsername" required autoComplete="off" defaultValue="RealAppUser" />
+function ChoiceField({ name, label, idLabel, hint, value, list }: {
+  name: string;
+  label: string;
+  idLabel: string;
+  hint?: string;
+  value: string | number | undefined;
+  list: ChoiceList | null;
+}) {
+  if (!list?.data) {
+    return (
+      <Field label={idLabel} hint={list?.error ? `Couldn't load from ARK: ${list.error}` : hint}>
+        <Input name={name} inputMode="numeric" required autoComplete="off" defaultValue={value} />
       </Field>
-      <SubmitButton pendingText="Looking up…">Find and save office ID</SubmitButton>
-    </form>
+    );
+  }
+  const current = value === undefined || value === "" ? undefined : Number(value);
+  const missing = current !== undefined && !list.data.some((c) => c.id === current);
+  const groups = [...new Set(list.data.map((c) => c.group ?? ""))];
+  const option = (c: ArkChoice) => (
+    <option key={c.id} value={c.id}>{c.label} (ID {c.id})</option>
+  );
+  return (
+    <Field label={label} hint={hint}>
+      <Select name={name} required defaultValue={current ?? ""}>
+        {current === undefined && <option value="" disabled>Choose…</option>}
+        {missing && <option value={current}>ID {current} (not in ARK&apos;s list)</option>}
+        {groups.length > 1 || groups[0]
+          ? groups.map((g) => (
+              <optgroup key={g} label={g || "Other"}>
+                {list.data.filter((c) => (c.group ?? "") === g).map(option)}
+              </optgroup>
+            ))
+          : list.data.map(option)}
+      </Select>
+    </Field>
   );
 }
-
