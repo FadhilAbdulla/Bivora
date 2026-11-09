@@ -67,8 +67,14 @@ async function findTopNode(config: ArkConfig) {
     await get(config, `/admin/public/api/v2/username/${encodeURIComponent(config.dealerUsername)}`).catch(() => null),
   )[0];
   let id = dealer ? userIdOf(dealer) : undefined;
-  if (id === undefined) return config.parentId;
-  let parent = parentIdOf(dealer);
+  let start = dealer;
+  if (id === undefined) {
+    // No access to the dealer's own record: climb from the saved office instead of stopping there.
+    id = config.parentId;
+    start = rowsOf(await get(config, `/admin/public/api/v2/user/${id}`).catch(() => null))[0];
+    if (!start) return id;
+  }
+  let parent = parentIdOf(start);
   for (let i = 0; i < 10 && parent && parent > 0 && parent !== id; i++) {
     const row = rowsOf(await get(config, `/admin/public/api/v2/user/${parent}`).catch(() => null))[0];
     if (!row) break;
@@ -191,13 +197,15 @@ export async function findArkOffice(username: string): Promise<{ officeId: numbe
   let searchError = "";
   if (!user) {
     try {
+      // Search the whole tree, not just the saved office: from the highest node the dealer can reach,
+      // then ARK's root node 1 in case the dealer can see more from there.
       const top = await findTopNode(config);
-      const offices = await listUsers(config, top, USER_TYPE.office);
-      user = offices.rows.find(matches);
-      // The top node itself may be the office.
-      if (!user) {
-        const self = rowsOf(await get(config, `/admin/public/api/v2/user/${top}`).catch(() => null))[0];
-        if (self && matches(self)) user = self;
+      for (const root of [...new Set([top, 1])]) {
+        const self = rowsOf(await get(config, `/admin/public/api/v2/user/${root}`).catch(() => null))[0];
+        if (self && matches(self)) { user = self; break; }
+        const offices = await listUsers(config, root, USER_TYPE.office).catch(() => null);
+        user = offices?.rows.find(matches);
+        if (user) break;
       }
     } catch (e) {
       searchError = e instanceof ArkError ? e.message : "the office search failed";
