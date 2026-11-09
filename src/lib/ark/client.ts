@@ -236,6 +236,51 @@ export function arkUsernameFor(userId: string) {
   return `bv${userId.slice(-10).toLowerCase()}`;
 }
 
+/** The broker's standard settings for a new real client. Office, policies and identity are added per client. */
+const CREATE_CLIENT_DEFAULTS = {
+  accountID: -1,
+  accountMirroringAccountIds: [],
+  accountMirroringPolicyId: -1,
+  address: "",
+  currencySign: "",
+  accountIdPrefix: "",
+  clientPriceExecution: false,
+  canTransferMoney: false,
+  canTransferPosition: false,
+  forceChangePassword: false,
+  ignoreLiquidation: false,
+  isAllowMultiSession: true,
+  isDemo: false,
+  isLocked: false,
+  percentageLevel1: 100.0,
+  percentageLevel2: 100.0,
+  percentageLevel3: 100.0,
+  percentageLevel4: 100.0,
+  creditLoanPercentage: 0.0,
+  roboDealerPolicyId: -1,
+  telephonePass: "",
+  tradingType: 1,
+  userCurrencyId: ARK_USER_CURRENCY_ID,
+  userType: 1,
+  validateMoneyBeforeClose: false,
+  validateMoneyBeforeEntry: true,
+  closeOnly: false,
+  openOnly: false,
+  noSellAtLoss: false,
+  enableCashDelivery: false,
+  enableDepositRequest: false,
+  canCreateOrUpdateEntryOrder: true,
+  // Bivora emails the login details itself, so ARK's own email would be a duplicate.
+  sendCredentialsEmailToUser: false,
+  blockFrequentTradesSeconds: 0,
+  isVerified: true,
+  ignoreBlockTradeIfInLoss: false,
+  userWhiteListIps: [],
+  enableApi: false,
+  chargeMarginForEntry: false,
+  assignAgentToMySelf: false,
+};
+
 export async function provisionArkAccount(config: ArkConfig, client: {
   id: string;
   email: string;
@@ -255,35 +300,17 @@ export async function provisionArkAccount(config: ArkConfig, client: {
   const created = await arkRequest(config, "/admin/public/api/v2/user", {
     method: "POST",
     body: JSON.stringify({
-      userType: 1,
-      tradingType: 1,
-      isDemo: false,
-      isLocked: false,
-      isVerified: true,
-      accountID: -1,
+      ...CREATE_CLIENT_DEFAULTS,
       parentId: config.parentId,
       genericPolicyID: config.genericPolicyId,
       currenciesPolicyID: config.currenciesPolicyId,
-      userCurrencyId: ARK_USER_CURRENCY_ID,
-      roboDealerPolicyId: -1,
-      accountMirroringPolicyId: -1,
-      accountMirroringAccountIds: [],
       username,
       password,
-      forceChangePassword: true,
-      // Bivora sends its own email with these details.
-      sendCredentialsEmailToUser: false,
       email: client.email,
       firstName: client.firstName,
       lastName: client.lastName,
       mobile: client.phone ?? "",
       country: client.country,
-      validateMoneyBeforeEntry: true,
-      canCreateOrUpdateEntryOrder: true,
-      // Deposits and withdrawals are requested through Bivora.
-      enableDepositRequest: false,
-      canTransferMoney: false,
-      canTransferPosition: false,
       customData: { bivoraUserId: client.id },
     }),
   });

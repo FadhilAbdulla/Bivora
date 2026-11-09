@@ -69,7 +69,7 @@ these, so the page shows the financial report's columns exactly as ARK returns t
   only posts the final money transaction to ARK on approval.
 - These details are entered at `/admin/settings`, not in environment variables.
 - To confirm with the broker: company name, dealer credentials, the `parentId` (office) for new
-  clients, the policy IDs (`genericPolicyID`, `currenciesPolicyID`) to assign (`userCurrencyId` is always 1), the
+  clients, the policy IDs (`genericPolicyID`, `currenciesPolicyID`) to assign (`userCurrencyId` is always 1, `ignoreLiquidation` is always false), the
   trading platform's login URL, and any password rules.
 - The docs show no response example for Create Client or Get User By Username. `client.ts` reads
   `userID` and `accountID`, the names used in ARK's report responses. Check this against a test account

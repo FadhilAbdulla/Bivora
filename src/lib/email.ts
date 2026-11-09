@@ -124,7 +124,7 @@ export function sendTradingCredentials(client: {
       `Temporary password: ${client.password}`,
       `Log in: ${url}`,
       "",
-      "You'll be asked to choose a new password the first time you log in. Please don't share these details with anyone. Bivora will never ask for your password.",
+      "We recommend changing this password after you log in. Please don't share these details with anyone. Bivora will never ask for your password.",
       "",
       "These details are for the trading platform. Keep using your existing Bivora login for deposits and withdrawals.",
       "",
@@ -139,7 +139,7 @@ export function sendTradingCredentials(client: {
       paragraph(`Hi ${escapeHtml(client.firstName)}, your documents have been approved. Here are your login details for the trading platform.`) +
         `<table role="presentation" style="width:100%;border-collapse:collapse;background:#f3f6f4;border-radius:8px;margin:0 0 20px;">${row("Username", client.username)}${row("Temporary password", client.password)}</table>` +
         button("Log in to trade", url) +
-        paragraph("You'll be asked to choose a new password the first time you log in. Please don't share these details with anyone. Bivora will never ask for your password.") +
+        paragraph("We recommend changing this password after you log in. Please don't share these details with anyone. Bivora will never ask for your password.") +
         paragraph("These details are for the trading platform. Keep using your existing Bivora login for deposits and withdrawals."),
     ),
   });
