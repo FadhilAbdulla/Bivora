@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { ArkPendingNotice } from "@/components/ark-pending";
 import { MarketOverview } from "@/components/markets/tradingview";
 import { FundRequestTable } from "@/components/fund-request-table";
 import { ButtonLink, Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
-import { isArkConnected } from "@/lib/ark";
+import { getClientArkAccount } from "@/lib/ark/account";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getAvailableBalance } from "@/lib/funds";
@@ -69,13 +70,10 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mt-6">
-        {isArkConnected() ? (
-          <Card className="p-5">
-            <p className="font-medium">Trading account</p>
-            <ButtonLink href="/dashboard/trading" variant="secondary" className="mt-3">
-              View trading account
-            </ButtonLink>
-          </Card>
+        {user.arkUserId ? (
+          <Suspense fallback={<TradingCard loading />}>
+            <TradingSummary arkUserId={user.arkUserId} currency={user.currency} />
+          </Suspense>
         ) : (
           <ArkPendingNotice compact />
         )}
@@ -99,5 +97,36 @@ export default async function DashboardPage() {
         </Card>
       </div>
     </>
+  );
+}
+
+async function TradingSummary({ arkUserId, currency }: { arkUserId: string; currency: string }) {
+  const account = await getClientArkAccount(arkUserId);
+  if ("error" in account || !account.summary) return <TradingCard />;
+  const s = account.summary;
+  const money = (n?: number) => (n === undefined ? "—" : formatMoney(n, currency));
+  return (
+    <TradingCard>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        {[["Balance", s.balance], ["Equity", s.equity], ["Credit", s.credit], ["Free margin", s.freeMargin]].map(([label, value]) => (
+          <div key={label as string}>
+            <p className="text-xs text-muted">{label}</p>
+            <p className="mt-0.5 font-mono font-medium tabular-nums">{money(value as number | undefined)}</p>
+          </div>
+        ))}
+      </div>
+    </TradingCard>
+  );
+}
+
+function TradingCard({ children, loading }: { children?: React.ReactNode; loading?: boolean }) {
+  return (
+    <Card className="p-5" aria-busy={loading}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-medium">Trading account</p>
+        <ButtonLink href="/dashboard/trading" variant="secondary">View trading account</ButtonLink>
+      </div>
+      {loading ? <div className="mt-3 h-10 animate-pulse rounded-md bg-surface-2" /> : children}
+    </Card>
   );
 }

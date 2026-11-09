@@ -3,15 +3,16 @@ import type { NextConfig } from "next";
 const dev = process.env.NODE_ENV !== "production";
 
 // What pages may load. Next.js injects inline scripts, so scripts need 'unsafe-inline'; everything
-// else is limited to this site, TradingView's widgets and the private R2 bucket for ID uploads.
+// else is limited to this site, TradingView's widgets and the private R2 bucket for ID documents.
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' https://s3.tradingview.com${dev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.tradingview.com",
+  // ID documents are shown through short-lived signed links on the private R2 bucket.
+  "img-src 'self' data: blob: https://*.tradingview.com https://*.r2.cloudflarestorage.com",
   "font-src 'self' data:",
   `connect-src 'self' https://*.r2.cloudflarestorage.com https://*.tradingview.com${dev ? " ws: wss:" : ""}`,
-  "frame-src https://*.tradingview.com https://*.tradingview-widget.com",
+  "frame-src https://*.tradingview.com https://*.tradingview-widget.com https://*.r2.cloudflarestorage.com",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
   "object-src 'none'",
