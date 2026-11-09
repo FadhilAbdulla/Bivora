@@ -39,7 +39,8 @@ Open http://localhost:3000. Clients use `/login`; the super admin signs in at `/
 | `/admin/requests` | super admin | All requests, filter by status/type, approve/reject |
 | `/admin/users` | super admin | Clients, balances, suspend/reactivate, manual adjustments |
 | `/admin/admins` | super admin | Add and deactivate admins, change your own password |
-| `/admin/ark` | super admin | ARK offices with their IDs, client counts and the trading financial report |
+| `/admin/ark` | super admin | Every ARK client account, tagged as opened in Bivora or in ARK, with its details |
+| `/admin/ark/money` | super admin | Post credit in/out, adjustments and bonuses to a client's ARK account (client is emailed), and every ARK money transaction |
 | `/admin/settings` | super admin | ARK connection details and dealer password |
 
 ## Brand

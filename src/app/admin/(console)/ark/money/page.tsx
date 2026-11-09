@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { randomUUID } from "node:crypto";
 import type { ReactNode } from "react";
 import { Alert, Button, ButtonLink, Card, CardHeader, EmptyState, Field, Input, PageHeader, Select, StatCard, cn } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
+import { MANUAL_MONEY_TYPES } from "@/lib/ark/client";
+import { STUCK_MS } from "@/lib/ark-money";
+import { db } from "@/lib/db";
+import { formatDate } from "@/lib/money";
+import { MoneyForm, RetryButton } from "./money-form";
 import {
   TRANSACTION_TYPES,
   amountOf,
@@ -47,13 +53,39 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
   const node = id(param(q.node));
   const before = id(param(q.before));
 
-  const [result, accounts] = await Promise.all([
+  const [result, accounts, arkClients, made] = await Promise.all([
     getArkMoney({ node, from, to, type: type && TRANSACTION_TYPES[type] ? type : undefined, demo, before }),
     bivoraAccounts(),
+    db.user.findMany({
+      where: { role: "USER", arkUserId: { not: null } },
+      select: { id: true, firstName: true, lastName: true, email: true, arkUsername: true },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+    }),
+    db.arkMoneyTransaction.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      include: { user: { select: { id: true, firstName: true, lastName: true, currency: true } }, admin: { select: { email: true } } },
+    }),
   ]);
 
   const header = (
-    <PageHeader title="ARK money flow" description="Every money transaction in ARK, whether Bivora sent it or it was entered in ARK directly." />
+    <>
+      <PageHeader title="ARK money flow" description="Post credit, adjustments and bonuses to clients, and see every money transaction in ARK." />
+      <div className="mb-6 grid items-start gap-4 sm:gap-6 xl:grid-cols-[minmax(0,26rem)_1fr]">
+        <Card>
+          <CardHeader title="New transaction" description="Goes straight to the client's ARK account, and the client is emailed." />
+          <MoneyForm
+            firstKey={randomUUID().replace(/-/g, "")}
+            types={MANUAL_MONEY_TYPES}
+            clients={arkClients.map((c) => ({ id: c.id, label: `${c.firstName} ${c.lastName} · ${c.arkUsername ?? c.email}` }))}
+          />
+        </Card>
+        <Card className="min-w-0">
+          <CardHeader title="Transactions you've made" description="Posted from here, newest first." />
+          <MadeList rows={made} stuckBefore={today.getTime() - STUCK_MS} />
+        </Card>
+      </div>
+    </>
   );
   if ("error" in result) {
     return (
@@ -190,10 +222,77 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
   );
 }
 
-function Tag({ tone, children }: { tone?: "brand"; children: ReactNode }) {
+function Tag({ tone, children }: { tone?: "brand" | "down" | "warn"; children: ReactNode }) {
   return (
-    <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", tone === "brand" ? "bg-brand/15 text-brand" : "bg-line text-muted")}>
+    <span
+      className={cn(
+        "rounded-full px-2 py-0.5 text-[11px] font-medium",
+        tone === "brand" ? "bg-brand/15 text-brand" : tone === "down" ? "bg-down/15 text-down" : tone === "warn" ? "bg-warning/15 text-warning" : "bg-line text-muted",
+      )}
+    >
       {children}
     </span>
+  );
+}
+
+const STATUS: Record<string, { label: string; tone?: "brand" | "down" | "warn" }> = {
+  DONE: { label: "Done", tone: "brand" },
+  FAILED: { label: "Failed", tone: "down" },
+  CHECK: { label: "Check in ARK", tone: "warn" },
+  PENDING: { label: "Sending…" },
+};
+
+function MadeList({ rows, stuckBefore }: {
+  /** Sends still running from before this were cut off. */
+  stuckBefore: number;
+  rows: {
+    id: string;
+    type: number;
+    amount: { toString(): string };
+    comment: string | null;
+    status: string;
+    error: string | null;
+    arkTrxId: string | null;
+    emailSentAt: Date | null;
+    attemptAt: Date | null;
+    createdAt: Date;
+    user: { id: string; firstName: string; lastName: string; currency: string };
+    admin: { email: string };
+  }[];
+}) {
+  if (rows.length === 0) return <EmptyState title="Nothing posted from here yet." />;
+  return (
+    <ul className="divide-y divide-line">
+      {rows.map((r) => {
+        const amount = Number(r.amount);
+        const minus = r.type === 4 || amount < 0;
+        const status = STATUS[r.status] ?? { label: r.status };
+        const stuck = r.status === "PENDING" && (r.attemptAt ?? r.createdAt).getTime() < stuckBefore;
+        return (
+          <li key={r.id} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 py-3 text-sm sm:px-5">
+            <div className="min-w-0 flex-1 basis-56 [overflow-wrap:anywhere]">
+              <p className="flex flex-wrap items-center gap-1.5">
+                <span className="font-medium">{MANUAL_MONEY_TYPES[r.type as keyof typeof MANUAL_MONEY_TYPES] ?? `Type ${r.type}`}</span>
+                <Tag tone={status.tone}>{status.label}</Tag>
+                {r.status === "DONE" && !r.emailSentAt && <Tag tone="warn">Email not sent</Tag>}
+              </p>
+              <p className="mt-0.5">
+                <Link href={`/admin/users/${r.user.id}`} className="hover:text-brand">{r.user.firstName} {r.user.lastName}</Link>
+                <span className="text-xs text-muted"> · by {r.admin.email} · {formatDate(r.createdAt)}</span>
+              </p>
+              {r.comment && <p className="text-xs text-muted">{r.comment}</p>}
+              {r.error && r.status !== "DONE" && <p className="text-xs text-down">{r.error}</p>}
+            </div>
+            <div className="shrink-0 text-right">
+              <p className={cn("font-mono font-medium tabular-nums", minus ? "text-down" : "text-up")}>
+                {minus ? "−" : "+"}{money(Math.abs(amount))}
+              </p>
+              {r.arkTrxId && <p className="font-mono text-xs text-muted">#{r.arkTrxId}</p>}
+              {(r.status === "FAILED" || r.status === "CHECK" || stuck) && <div className="mt-1"><RetryButton id={r.id} /></div>}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

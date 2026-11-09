@@ -50,6 +50,8 @@ model User {
   ledgerEntries    LedgerEntry[]
   kycDocuments     KycDocument[]
   bankAccounts     BankAccount[]
+  arkMoney         ArkMoneyTransaction[] @relation("arkMoneyClient")
+  arkMoneyMade     ArkMoneyTransaction[] @relation("arkMoneyAdmin")
 }
 
 // type:   DEPOSIT | WITHDRAWAL
@@ -179,3 +181,29 @@ model RateLimit {
   windowStart DateTime
 }
 
+
+// Money an admin posts to a client's ARK account from the Money flow page (credit in/out,
+// adjustment, bonus). The row id goes to ARK as requestReference, so ARK refuses a repeat.
+model ArkMoneyTransaction {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation("arkMoneyClient", fields: [userId], references: [id])
+  arkUserId   String
+  // ARK trxType: 3 credit in, 4 credit out, 5 adjustment, 6 bonus.
+  type        Int
+  amount      Decimal
+  comment     String?
+  // PENDING while ARK is asked, then DONE or FAILED (with ARK's message in error).
+  status      String    @default("PENDING")
+  error       String?
+  arkTrxId    String?
+  adminId     String
+  admin       User      @relation("arkMoneyAdmin", fields: [adminId], references: [id])
+  emailSentAt DateTime?
+  // When it was last sent to ARK; a send still PENDING long after this was cut off.
+  attemptAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}

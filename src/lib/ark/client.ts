@@ -199,16 +199,54 @@ export async function arkHeartbeat(): Promise<"ok" | "no-session" | "ended"> {
   return "ok";
 }
 
-type ArkUser = { userID?: number; userId?: number; id?: number; accountID?: number; accountId?: number };
+type ArkUser = {
+  userID?: number;
+  userId?: number;
+  id?: number;
+  accountID?: number;
+  accountId?: number;
+  username?: string;
+  userName?: string;
+  email?: string;
+  customData?: { bivoraUserId?: unknown } | null;
+};
 
+/** ARK's user lookup returns the user, or a list of users; pick the one with this username. */
+function lookupUser(data: unknown, username: string): ArkUser | null {
+  if (!data || typeof data !== "object") return null;
+  const list = Array.isArray(data) ? data : Array.isArray((data as { users?: unknown }).users) ? (data as { users: unknown[] }).users : [data];
+  const users = list.filter((u): u is ArkUser => typeof u === "object" && u !== null);
+  const wanted = username.toLowerCase();
+  return users.find((u) => (u.username ?? u.userName ?? "").toLowerCase() === wanted) ?? (users.length === 1 ? users[0] : null);
+}
+
+/**
+ * The ARK user with this username, or null when ARK says there is none. Any other failure throws,
+ * so a broken lookup is never mistaken for a free username.
+ */
 async function findByUsername(config: ArkConfig, username: string) {
-  const result = await arkRequest<ArkUser>(config, `/admin/public/api/v2/username/${encodeURIComponent(username)}`, {
+  const result = await arkRequest<unknown>(config, `/admin/public/api/v2/username/${encodeURIComponent(username)}`, {
     method: "GET",
   });
-  if (!result.ok || !result.data) return null;
-  const { userID, userId, id, accountID, accountId } = result.data;
-  const arkUserId = userID ?? userId ?? id;
-  return arkUserId == null ? null : { arkUserId: String(arkUserId), arkAccountId: String(accountID ?? accountId ?? "") || null };
+  if (!result.ok) {
+    if (result.status === 404 || /not ?found|does ?n.t exist|no (such )?user/i.test(result.message ?? "")) return null;
+    throw new ArkError(`ARK couldn't check the username: ${result.message ?? result.status}`);
+  }
+  const user = lookupUser(result.data, username);
+  if (!user) return null;
+  const arkUserId = user.userID ?? user.userId ?? user.id;
+  if (arkUserId == null) return null;
+  return {
+    arkUserId: String(arkUserId),
+    arkAccountId: String(user.accountID ?? user.accountId ?? "") || null,
+    owner: { bivoraUserId: typeof user.customData?.bivoraUserId === "string" ? user.customData.bivoraUserId : null, email: user.email ?? null },
+  };
+}
+
+/** Whether an ARK account was opened by Bivora for this client (its tag, or failing that its email). */
+function belongsTo(owner: { bivoraUserId: string | null; email: string | null }, client: { id: string; email: string }) {
+  if (owner.bivoraUserId) return owner.bivoraUserId === client.id;
+  return !!owner.email && owner.email.toLowerCase() === client.email.toLowerCase();
 }
 
 async function setPassword(config: ArkConfig, arkUserId: string, password: string) {
@@ -231,9 +269,28 @@ export function generateArkPassword() {
   return chars.join("");
 }
 
-/** Derived from the client's id, so a retried approval finds the same ARK account instead of creating another. */
-export function arkUsernameFor(userId: string) {
+/** Before random usernames: kept so an approval interrupted under the old scheme still finds its account. */
+function legacyUsername(userId: string) {
   return `bv${userId.slice(-10).toLowerCase()}`;
+}
+
+/** The client's first name in plain letters, e.g. "Fadhil" (accents dropped), or "Client" if none are left. */
+function usernameBase(firstName: string) {
+  const letters = firstName.normalize("NFKD").replace(/[^A-Za-z]/g, "").slice(0, 16);
+  return letters ? letters[0].toUpperCase() + letters.slice(1).toLowerCase() : "Client";
+}
+
+/** First name plus 4 random digits (5 if the 4-digit ones keep colliding), unused in ARK and in Bivora. */
+async function pickUsername(config: ArkConfig, firstName: string) {
+  const base = usernameBase(firstName);
+  for (let attempt = 0; attempt < 15; attempt++) {
+    const digits = attempt < 10 ? 4 : 5;
+    const name = `${base}${randomInt(10 ** (digits - 1), 10 ** digits)}`;
+    const inBivora = await db.user.findFirst({ where: { arkUsername: { equals: name, mode: "insensitive" } }, select: { id: true } });
+    if (inBivora) continue;
+    if (!(await findByUsername(config, name))) return name;
+  }
+  throw new ArkError("Couldn't find a free ARK username. Try approving again.");
 }
 
 /** The broker's standard settings for a new real client. Office, policies and identity are added per client. */
@@ -283,19 +340,29 @@ const CREATE_CLIENT_DEFAULTS = {
 
 export async function provisionArkAccount(config: ArkConfig, client: {
   id: string;
+  /** A username kept from an earlier, interrupted approval. */
+  arkUsername: string | null;
   email: string;
   firstName: string;
   lastName: string;
   phone: string | null;
   country: string;
 }, password: string) {
-  const username = arkUsernameFor(client.id);
-
-  const existing = await findByUsername(config, username);
-  if (existing) {
-    await setPassword(config, existing.arkUserId, password);
-    return { ...existing, arkUsername: username };
+  // An interrupted approval may already have created the account: reuse it instead of making another.
+  for (const name of [client.arkUsername, legacyUsername(client.id)]) {
+    if (!name) continue;
+    const existing = await findByUsername(config, name);
+    if (existing && belongsTo(existing.owner, client)) {
+      await setPassword(config, existing.arkUserId, password);
+      return { arkUserId: existing.arkUserId, arkAccountId: existing.arkAccountId, arkUsername: name };
+    }
+    // Someone else took the kept name in ARK meanwhile: pick a new one below.
+    if (existing && name === client.arkUsername) client = { ...client, arkUsername: null };
   }
+
+  // Kept on the client before ARK sees it, so a retry after a cut-off request finds this account.
+  const username = client.arkUsername ?? (await pickUsername(config, client.firstName));
+  if (username !== client.arkUsername) await db.user.update({ where: { id: client.id }, data: { arkUsername: username } });
 
   const created = await arkRequest(config, "/admin/public/api/v2/user", {
     method: "POST",
@@ -318,9 +385,54 @@ export async function provisionArkAccount(config: ArkConfig, client: {
 
   const account = await findByUsername(config, username);
   if (!account) throw new ArkError("ARK created the account but didn't return its details. Try approving again.");
-  return { ...account, arkUsername: username };
+  return { arkUserId: account.arkUserId, arkAccountId: account.arkAccountId, arkUsername: username };
 }
 
 export async function resetArkPassword(config: ArkConfig, arkUserId: string, password: string) {
   await setPassword(config, arkUserId, password);
+}
+
+// ---------- Money transactions ----------
+
+/** ARK's trxType values an admin may post by hand. Deposits and withdrawals go through fund requests. */
+export const MANUAL_MONEY_TYPES = { 3: "Credit in", 4: "Credit out", 5: "Adjustment", 6: "Bonus" } as const;
+export type ManualMoneyType = keyof typeof MANUAL_MONEY_TYPES;
+
+/** ARK's date format: the server's local time, `yyyy-MM-dd HH:mm:ss.SSS`. */
+function arkTimestamp(date: Date) {
+  const p = (n: number, w = 2) => String(n).padStart(w, "0");
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}.${p(date.getMilliseconds(), 3)}`;
+}
+
+/**
+ * Posts one money transaction to a client's ARK account. `reference` must be unique: ARK refuses a
+ * reference it has seen, so a retried request can never post twice. Returns ARK's transaction ID.
+ */
+export async function postArkMoney(
+  config: ArkConfig,
+  op: { arkUserId: string; type: ManualMoneyType; amount: number; comment: string; reference: string },
+) {
+  const result = await arkRequest<unknown>(config, "/admin/public/api/v2/money/transaction", {
+    method: "POST",
+    body: JSON.stringify({
+      userId: Number(op.arkUserId),
+      trxType: op.type,
+      trxAmount: op.amount,
+      trxComment: op.comment,
+      message: op.comment,
+      trxDate: arkTimestamp(new Date()),
+      requestReference: op.reference,
+    }),
+  });
+  if (!result.ok) throw new ArkError(`ARK refused the transaction: ${result.message ?? result.status}`);
+  // ARK sends its result as a JSON string: {"data":{"trxId":…}}.
+  let trxId: string | null = null;
+  try {
+    const data = typeof result.data === "string" ? JSON.parse(result.data) : result.data;
+    const id = data?.data?.trxId ?? data?.trxId;
+    if (id != null) trxId = String(id);
+  } catch {
+    // The transaction went through; only its ID is unreadable.
+  }
+  return trxId;
 }

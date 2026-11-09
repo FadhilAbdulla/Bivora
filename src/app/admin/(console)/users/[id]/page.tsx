@@ -105,7 +105,7 @@ export default async function UserDetailPage({ params }: PageProps<"/admin/users
         {isKycInReview(user.kycStatus) && <KycReview userId={user.id} />}
       </Card>
 
-      {user.arkUsername && (
+      {user.arkUserId && user.arkUsername && (
         <Card className="mt-6">
           <CardHeader
             title="ARK trading account"

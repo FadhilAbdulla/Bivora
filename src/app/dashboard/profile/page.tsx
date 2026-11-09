@@ -71,7 +71,7 @@ export default async function ProfilePage() {
             </Row>
             <Row label="Member since">{formatDate(user.createdAt)}</Row>
             <Row label="Base currency">{user.currency}</Row>
-            <Row label="Trading username">{user.arkUsername ?? <span className="text-warning">Pending</span>}</Row>
+            <Row label="Trading username">{(user.arkUserId && user.arkUsername) || <span className="text-warning">Pending</span>}</Row>
           </dl>
         </Card>
       </div>

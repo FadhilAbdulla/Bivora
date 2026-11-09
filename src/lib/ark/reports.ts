@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "../db";
 import { ArkError, arkRequest, ensureArkSession, loadArkConfig, type ArkConfig } from "./client";
 
-// Read-only ARK reports for the admin console: offices, clients and their financial standing.
+// Read-only ARK reports for the admin console: client accounts, money transactions and settings lists.
 // ARK's docs give no response examples for these, so rows are kept as ARK sends them and the
 // page shows whatever columns come back. Endpoint reference: docs/ark-api.md
 
@@ -111,11 +111,6 @@ async function listUsers(config: ArkConfig, node: number, userTypeId: number) {
   return { rows: [...byId.values()], capped };
 }
 
-async function financials(config: ArkConfig, node: number) {
-  const query = new URLSearchParams({ userIds: String(node), withDemo: "false" });
-  return rowsOf(await get(config, `/financialStandings/public/api/v2/userFinancials?${query}`));
-}
-
 async function section<T>(work: () => Promise<T>): Promise<Section<T>> {
   try {
     return { data: await work() };
@@ -131,13 +126,17 @@ export type ArkOverview =
   | {
       top: number;
       node: number;
-      /** ARK's own record for the node, for its name. */
-      nodeInfo: ArkRow | null;
-      offices: Section<{ rows: ArkRow[]; capped: boolean }>;
+      /** ARK's own record for the top node, for its name. */
+      topInfo: ArkRow | null;
+      /** Offices under the top node, to switch between. */
+      offices: ArkChoice[];
       clients: Section<{ rows: ArkRow[]; capped: boolean }>;
-      financials: Section<ArkRow[]>;
     };
 
+/**
+ * Client accounts under one office. With no office asked for, it opens on the office new clients
+ * are created in (ARK settings), or everything under the top node when that office isn't listed.
+ */
 export async function getArkOverview(requestedNode?: number): Promise<ArkOverview> {
   let config: ArkConfig;
   let top: number;
@@ -150,14 +149,17 @@ export async function getArkOverview(requestedNode?: number): Promise<ArkOvervie
     if (e instanceof ArkError) return { error: e.message };
     throw e;
   }
-  const node = requestedNode ?? top;
-  const [nodeInfo, offices, clients, standing] = await Promise.all([
-    get(config, `/admin/public/api/v2/user/${node}`).then((d) => rowsOf(d)[0] ?? null, () => null),
-    section(() => listUsers(config, node, USER_TYPE.office)),
-    section(() => listUsers(config, node, USER_TYPE.client)),
-    section(() => financials(config, node)),
+  const [topInfo, officeList] = await Promise.all([
+    get(config, `/admin/public/api/v2/user/${top}`).then((d) => rowsOf(d)[0] ?? null, () => null),
+    listUsers(config, top, USER_TYPE.office).catch(() => null),
   ]);
-  return { top, node, nodeInfo, offices, clients, financials: standing };
+  const offices = (officeList?.rows ?? [])
+    .filter((r) => userIdOf(r) !== top)
+    .map(officeChoice)
+    .sort((a, b) => a.label.localeCompare(b.label));
+  const node = requestedNode ?? (offices.some((o) => o.id === config.parentId) ? config.parentId : top);
+  const clients = await section(() => listUsers(config, node, USER_TYPE.client));
+  return { top, node, topInfo, offices, clients };
 }
 
 // ---------- Choices for ARK settings ----------
@@ -171,6 +173,13 @@ export type ArkChoices = {
 
 const textOf = (row: ArkRow, keys: string[]) =>
   keys.map((k) => row[k]).find((v): v is string => typeof v === "string" && v.trim() !== "")?.trim() ?? "";
+
+function officeChoice(row: ArkRow): ArkChoice {
+  const id = userIdOf(row)!;
+  const name = nameOf(row);
+  const username = textOf(row, ["username", "userName"]);
+  return { id, label: [name, username && username !== name ? username : ""].filter(Boolean).join(" · ") || `Office ${id}` };
+}
 
 /** Client policies ARK lists for the dealer. `kind` is ARK's path: generic or currency (script). */
 async function clientPolicies(config: ArkConfig, kind: "generic" | "currency") {
@@ -208,12 +217,7 @@ export async function getArkChoices(): Promise<ArkChoices | { error: string }> {
       // The top node is an office too when the dealer sits directly under it.
       if (self && userTypeOf(self) === USER_TYPE.office && !rows.some((r) => userIdOf(r) === top)) rows.unshift(self);
       return rows
-        .map((r) => {
-          const id = userIdOf(r)!;
-          const name = nameOf(r);
-          const username = textOf(r, ["username", "userName"]);
-          return { id, label: [name, username && username !== name ? username : ""].filter(Boolean).join(" · ") || `Office ${id}` };
-        })
+        .map(officeChoice)
         .sort((a, b) => a.label.localeCompare(b.label));
     }),
     section(() => clientPolicies(config, "generic")),
@@ -278,7 +282,7 @@ export type ArkMoney =
       /** Pass as `before` for the next, older page; undefined when this is the last. */
       older?: number;
       clients: Section<{ rows: ArkRow[]; capped: boolean }>;
-      /** FundRequest IDs Bivora sent to ARK as requestReference. */
+      /** FundRequest and ArkMoneyTransaction IDs Bivora sent to ARK as requestReference. */
       bivoraReferences: Set<string>;
     };
 
@@ -311,7 +315,10 @@ export async function getArkMoney(filters: MoneyFilters): Promise<ArkMoney> {
 
   const references = [...new Set(rows.map((r) => r.requestReference).filter((v): v is string => typeof v === "string" && v !== ""))];
   const known = references.length
-    ? await db.fundRequest.findMany({ where: { id: { in: references } }, select: { id: true } })
+    ? [
+        ...(await db.fundRequest.findMany({ where: { id: { in: references } }, select: { id: true } })),
+        ...(await db.arkMoneyTransaction.findMany({ where: { id: { in: references } }, select: { id: true } })),
+      ]
     : [];
   const ids = rows.map((r) => pick(r, ["id", "trxId"])).filter((v): v is number => v !== undefined);
   return {

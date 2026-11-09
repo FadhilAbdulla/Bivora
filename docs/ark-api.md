@@ -26,7 +26,8 @@ Responses share the envelope `{ data, message, httpStatus, errorCode, success }`
 
 | Bivora function (`src/lib/ark/index.ts`) | ARK endpoint |
 | --- | --- |
-| `provisionArkAccount` (`client.ts`) | `POST /admin/public/api/v2/user` — Create Client, then `GET /admin/public/api/v2/username/{username}` for its IDs |
+| `provisionArkAccount` (`client.ts`) | Username = first name + 4 random digits (e.g. `Fadhil3546`), checked free with `GET /admin/public/api/v2/username/{name}` (404 = free) and kept on the client before `POST /admin/public/api/v2/user` — Create Client, then the same lookup for its IDs. A retried approval reuses its kept name only if that ARK account carries the client's `customData.bivoraUserId` (or email). |
+| `postArkMoney` (`client.ts`), used by `src/lib/ark-money.ts` | `POST /admin/public/api/v2/money/transaction` with `userId`, `trxType` (3 credit in · 4 credit out · 5 adjustment · 6 bonus), `trxAmount`, `trxComment` ("Bivora …"), `trxDate`, and the `ArkMoneyTransaction` id as `requestReference`. ARK answers "Request reference already used" to a repeat, which a retry treats as done. |
 | `resetArkPassword` (`client.ts`) | `PUT /admin/public/api/v2/user/{userId}` with `{ "password": "…", "forceChangePassword": true }` |
 | `getAccountSummary` | `GET /trading/public/api/v2/userFinancials/{userId}` — Financial Standing |
 | `getOpenPositions` | `GET /trading/public/api/v2/report/open/positions/{userId}/0?fromDate&toDate&limit&offset` (0 = buy+sell) |
@@ -39,14 +40,13 @@ Responses share the envelope `{ data, message, httpStatus, errorCode, success }`
 | What | ARK endpoint |
 | --- | --- |
 | Top node | `GET /admin/public/api/v2/username/{dealerUsername}`, then `GET /admin/public/api/v2/user/{parentId}` up the tree until ARK refuses |
-| Offices / clients | `GET /admin/public/api/v2/report/users/details/{nodeId}?fromDate&toDate&withDemo=true&userTypeId=2` (offices) or `=1` (clients), `limit=500`, pages merged by user ID |
-| Trading financial report | `GET /financialStandings/public/api/v2/userFinancials?userIds={nodeId}&withDemo=false` (an office node returns all its clients) |
-| Settings: office dropdown | The offices report above, from the top node |
+| Client accounts | `GET /admin/public/api/v2/report/users/details/{nodeId}?fromDate&toDate&withDemo=true&userTypeId=1`, `limit=500`, pages merged by user ID |
+| Settings: office dropdown | The same report with `userTypeId=2`, from the top node |
 | Settings: generic policies | `GET /admin/public/api/v2/client/generic/policy/1` → `[{ id, policyName }]` |
 | Settings: script policies | `GET /admin/public/api/v2/client/currency/policy/1` → `[{ id, policyName, policyTypeId, parentId }]`; `policyTypeId` 2 is a group, listed only as a heading |
 
 `userTypeId`: 1 Client · 2 Office · 3 Dealer · 4 Department. The docs have no response examples for
-these, so the page shows the financial report's columns exactly as ARK returns them.
+these, so an account's details show its fields exactly as ARK returns them.
 
 ### Money transaction
 
