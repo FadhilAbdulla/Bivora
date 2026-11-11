@@ -18,7 +18,7 @@ export function AddClientButton() {
         open={open}
         onClose={() => setOpen(false)}
         title="Add client"
-        description="Opens their Bivora account and their ARK trading account with the password you choose, and emails their trading login. Share the password with them privately."
+        description="Opens their Bivora account and their ARK trading account with the password you choose. Their trading login is emailed once their documents are uploaded. Share the password with them privately."
       >
         <AddClientForm onClose={() => setOpen(false)} />
       </Modal>

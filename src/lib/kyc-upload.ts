@@ -1,5 +1,6 @@
 import "server-only";
 import { basename } from "node:path";
+import { sendLoginWhenDocumentsDone } from "./client-approval";
 import { db } from "./db";
 import { BOTH_SLOT, IMAGE_TYPES, MAX_DOCUMENT_BYTES, PDF_TYPE, findSlot } from "./kyc";
 import { createUploadLink, detectMimeType, inspectUpload, isOwnStorageKey, removeDocument } from "./kyc-storage";
@@ -78,6 +79,9 @@ export async function saveUpload(userId: string, body: { type?: unknown; slot?: 
     const id = await removeSlot(userId, type, other);
     if (id) removedIds.push(id);
   }
+
+  // A client an admin opened gets their trading login once every document is in.
+  await sendLoginWhenDocumentsDone(userId);
 
   return { ok: true, document: { id: doc.id, type, slot, fileName: doc.fileName, mimeType, size: doc.size }, removedIds };
 }

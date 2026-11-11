@@ -12,7 +12,7 @@ export function CreateArkButton({ userId }: { userId: string }) {
       type="button"
       disabled={pending}
       onClick={() => {
-        if (!confirm("Create this client's ARK account now and email their trading login?")) return;
+        if (!confirm("Create this client's ARK account now?")) return;
         start(async () => {
           const data = new FormData();
           data.set("userId", userId);

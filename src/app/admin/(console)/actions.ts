@@ -174,9 +174,7 @@ export async function createClient(_prev: FormState, formData: FormData): Promis
     return { success: `${user.firstName}'s Bivora account is ready, but ARK didn't open their trading account: ${ark.error} Use Create ARK account on their page to try again.` };
   }
   return {
-    success: ark.warning
-      ? `${user.firstName}'s Bivora and ARK accounts are ready, but the trading login email didn't send. Use Resend login details on their page.`
-      : `${user.firstName}'s Bivora and ARK accounts are ready, and their trading login has been emailed. Share the password with them privately.`,
+    success: `${user.firstName}'s Bivora and ARK accounts are ready. Their trading login is emailed once their documents are uploaded. Share the password with them privately.`,
   };
 }
 
@@ -258,5 +256,5 @@ export async function createArkAccountNow(formData: FormData): Promise<FormState
   await clearArkCache();
   refresh();
   if (result.error) return { error: result.error };
-  return { success: result.warning ? "ARK account created, but the login email didn't send. Use Resend login details." : "ARK account created and the trading login emailed." };
+  return { success: "ARK account created. Their trading login is emailed once their documents are uploaded." };
 }

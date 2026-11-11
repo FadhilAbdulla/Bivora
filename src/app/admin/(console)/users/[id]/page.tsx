@@ -150,7 +150,7 @@ export default async function UserDetailPage({ params }: PageProps<"/admin/users
         <Card className="mt-6">
           <CardHeader
             title="ARK trading account"
-            description="Not created yet. It uses the password you set for this client, and their trading login is emailed."
+            description="Not created yet. It uses the password you set for this client. Their trading login is emailed once their documents are uploaded."
             action={<CreateArkButton userId={user.id} />}
           />
         </Card>

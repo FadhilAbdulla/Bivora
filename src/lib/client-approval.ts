@@ -65,7 +65,15 @@ export async function approveClient(userId: string): Promise<ApprovalResult> {
   // Opened by an admin with its ARK account already made: approval only marks the documents as checked.
   if (user.arkUserId) {
     await db.user.update({ where: { id: userId }, data: { kycStatus: "APPROVED", kycReviewedAt: new Date() } });
-    return {};
+    if (user.arkCredentialsSentAt || !user.arkUsername) return {};
+    const sent = await emailCredentials(userId, {
+      email: user.email,
+      firstName: user.firstName,
+      username: user.arkUsername,
+      password: null,
+      tradingUrl: ready.config.tradingUrl,
+    });
+    return sent ? {} : { warning: EMAIL_FAILED };
   }
 
   // An admin who opened the account chose the client's password: their ARK account gets the same one.
@@ -134,11 +142,16 @@ export async function resendCredentials(userId: string): Promise<ApprovalResult>
 
 /**
  * For a client an admin opened: creates their ARK account now with the password the admin chose
- * (the same as their Bivora password) and emails their trading login. Documents and approval follow.
+ * (the same as their Bivora password). Their trading login is emailed once their documents are uploaded.
  */
 export async function openArkAccountNow(userId: string): Promise<ApprovalResult> {
-  const ready = await prepare();
-  if ("error" in ready) return ready;
+  let config: ArkConfig;
+  try {
+    config = await loadArkConfig();
+  } catch (e) {
+    if (e instanceof ArkError) return { error: e.message };
+    throw e;
+  }
   const user = await db.user.findFirst({ where: { id: userId, role: "USER" } });
   if (!user) return { error: "Client not found." };
   if (user.arkUserId) return { error: "This client already has an ARK account." };
@@ -152,20 +165,53 @@ export async function openArkAccountNow(userId: string): Promise<ApprovalResult>
   }
   let account;
   try {
-    account = await provisionArkAccount(ready.config, { ...user, country: user.country ?? countryByIso(parsePhone(user.phone).iso).name }, password);
+    account = await provisionArkAccount(config, { ...user, country: user.country ?? countryByIso(parsePhone(user.phone).iso).name }, password);
   } catch (e) {
     if (e instanceof ArkError) return { error: e.message };
     throw e;
   }
   await db.user.update({ where: { id: userId }, data: { ...account, arkPasswordEnc: null } });
+  // Documents may already be in place if the account opened on a retry.
+  await sendLoginWhenDocumentsDone(userId);
+  return {};
+}
 
-  const sent = await emailCredentials(userId, {
-    email: user.email,
-    firstName: user.firstName,
-    username: account.arkUsername,
-    // The same as their Bivora password: never sent by email.
-    password: null,
-    tradingUrl: ready.config.tradingUrl,
-  });
-  return sent ? {} : { warning: EMAIL_FAILED };
+/**
+ * Emails the trading login to a client an admin opened, once all their required documents are uploaded.
+ * Sent once; does nothing for anyone else. Never throws, so an upload never fails because of it.
+ */
+export async function sendLoginWhenDocumentsDone(userId: string): Promise<boolean> {
+  try {
+    const user = await db.user.findFirst({
+      where: { id: userId, role: "USER" },
+      include: { kycDocuments: { select: { type: true, slot: true, mimeType: true } } },
+    });
+    // Before approval, only a client an admin opened has an ARK account.
+    if (!user?.arkUserId || !user.arkUsername || user.arkCredentialsSentAt) return false;
+    if (user.kycStatus === "APPROVED" || user.kycStatus === "APPROVING") return false;
+    if (!isKycComplete(user.kycDocuments) || missingEmailSettings().length) return false;
+
+    // Claimed first, so two uploads finishing at once send one email.
+    const { count } = await db.user.updateMany({ where: { id: userId, arkCredentialsSentAt: null }, data: { arkCredentialsSentAt: new Date() } });
+    if (count === 0) return false;
+    try {
+      const config = await loadArkConfig();
+      await sendTradingCredentials({
+        email: user.email,
+        firstName: user.firstName,
+        username: user.arkUsername,
+        // The same as their Bivora password: never sent by email.
+        password: null,
+        tradingUrl: config.tradingUrl,
+      });
+      return true;
+    } catch (e) {
+      await db.user.update({ where: { id: userId }, data: { arkCredentialsSentAt: null } });
+      console.error("Trading login email failed", userId, e instanceof Error ? e.message : "");
+      return false;
+    }
+  } catch (e) {
+    console.error("Trading login check failed", userId, e instanceof Error ? e.message : "");
+    return false;
+  }
 }
