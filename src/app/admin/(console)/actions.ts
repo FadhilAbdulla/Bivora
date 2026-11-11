@@ -8,7 +8,7 @@ import { siteUrl } from "@/lib/brand";
 import { countryByIso, parsePhone } from "@/lib/countries";
 import { missingEmailSettings, sendAccountOpened, sendLater } from "@/lib/email";
 import { SecretKeyError, encryptSecret } from "@/lib/secrets";
-import { approveClient, resendCredentials } from "@/lib/client-approval";
+import { approveClient, openArkAccountNow, resendCredentials } from "@/lib/client-approval";
 import { ArkError, loadArkConfig, setArkDemo } from "@/lib/ark/client";
 import { db } from "@/lib/db";
 import { formValues, type FormState } from "@/lib/form";
@@ -163,11 +163,21 @@ export async function createClient(_prev: FormState, formData: FormData): Promis
   const user = await db.user.create({
     data: { ...data, country: countryByIso(parsePhone(data.phone).iso).name, passwordHash: await hashPassword(password), arkPasswordEnc },
   });
-  refresh();
   if (!missingEmailSettings().length) {
     sendLater("Account opened", () => sendAccountOpened({ email: user.email, firstName: user.firstName, url: `${siteUrl}/login` }));
   }
-  return { success: `${user.firstName}'s account is ready. Share the password with them privately; add their documents on their page.` };
+  // Their ARK account opens now, with the same password, and their trading login is emailed.
+  const ark = await openArkAccountNow(user.id);
+  await clearArkCache();
+  refresh();
+  if (ark.error) {
+    return { success: `${user.firstName}'s Bivora account is ready, but ARK didn't open their trading account: ${ark.error} Use Create ARK account on their page to try again.` };
+  }
+  return {
+    success: ark.warning
+      ? `${user.firstName}'s Bivora and ARK accounts are ready, but the trading login email didn't send. Use Resend login details on their page.`
+      : `${user.firstName}'s Bivora and ARK accounts are ready, and their trading login has been emailed. Share the password with them privately.`,
+  };
 }
 
 const newAdminSchema = z.object({
@@ -239,4 +249,14 @@ export async function setClientDemo(formData: FormData): Promise<FormState> {
   await clearArkCache();
   refresh();
   return { success: demo ? "Switched to a demo account." : "Switched to a real account." };
+}
+
+/** Creates the ARK account for a client an admin opened, if it didn't open at the time. */
+export async function createArkAccountNow(formData: FormData): Promise<FormState> {
+  await requireAdmin();
+  const result = await openArkAccountNow(String(formData.get("userId") ?? ""));
+  await clearArkCache();
+  refresh();
+  if (result.error) return { error: result.error };
+  return { success: result.warning ? "ARK account created, but the login email didn't send. Use Resend login details." : "ARK account created and the trading login emailed." };
 }

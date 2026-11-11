@@ -14,6 +14,7 @@ import { KycReview, ResendCredentials } from "../../kyc-review";
 import { ReviewActions } from "../../review-actions";
 import { AdjustBalanceForm } from "./adjust-balance-form";
 import { AdminDocuments } from "./admin-documents";
+import { CreateArkButton } from "./create-ark";
 import { DemoSwitch } from "./demo-switch";
 import { ArkMoneySection, ArkMoneySectionLoading } from "./ark-money-section";
 
@@ -142,6 +143,16 @@ export default async function UserDetailPage({ params }: PageProps<"/admin/users
             </div>
           </dl>
           <ResendCredentials userId={user.id} sent={Boolean(user.arkCredentialsSentAt)} />
+        </Card>
+      )}
+
+      {!user.arkUserId && user.arkPasswordEnc && (
+        <Card className="mt-6">
+          <CardHeader
+            title="ARK trading account"
+            description="Not created yet. It uses the password you set for this client, and their trading login is emailed."
+            action={<CreateArkButton userId={user.id} />}
+          />
         </Card>
       )}
 
