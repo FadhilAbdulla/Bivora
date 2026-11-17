@@ -16,9 +16,15 @@ function authorized(request: NextRequest) {
 export async function GET(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    return NextResponse.json({ session: await arkHeartbeat() });
+    const session = await arkHeartbeat();
+    // Shows in Vercel's logs, so it's easy to see the session staying open.
+    console.log(`ARK heartbeat: ${session}`);
+    return NextResponse.json({ session });
   } catch (e) {
-    if (e instanceof ArkError) return NextResponse.json({ error: e.message }, { status: 502 });
+    if (e instanceof ArkError) {
+      console.warn(`ARK heartbeat failed: ${e.message}`);
+      return NextResponse.json({ error: e.message }, { status: 502 });
+    }
     throw e;
   }
 }

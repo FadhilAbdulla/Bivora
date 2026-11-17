@@ -59,7 +59,14 @@ export async function arkCached<T extends object>(name: string, args: unknown, l
   return data;
 }
 
-/** After a change made in Bivora (settings, money, approvals), the next view asks ARK again. */
-export async function clearArkCache() {
-  await db.arkCache.deleteMany({});
+/**
+ * After a change made in Bivora, the next view asks ARK again. With names, only those replies
+ * (e.g. "money") are cleared, so the rest of the admin stays fast; without, everything is.
+ */
+export async function clearArkCache(names?: string[]) {
+  if (!names) {
+    await db.arkCache.deleteMany({});
+    return;
+  }
+  await db.arkCache.deleteMany({ where: { OR: names.map((n) => ({ key: { startsWith: `${n}:` } })) } });
 }

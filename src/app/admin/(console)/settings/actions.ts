@@ -74,6 +74,7 @@ export async function saveArkSettings(_prev: FormState, formData: FormData): Pro
         sessionTokenEnc: null,
         sessionUsedAt: null,
         sessionLoginAt: null,
+        sessionLoginFailedAt: null,
       },
     }),
     db.arkSettingsChange.create({ data: { adminEmail: admin.email, fields: changed.join(", ") } }),

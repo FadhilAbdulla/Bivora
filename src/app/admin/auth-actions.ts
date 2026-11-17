@@ -20,19 +20,20 @@ export async function adminLogin(_prev: FormState, formData: FormData): Promise<
 
   const { email, password } = parsed.data;
   // Stricter than client login: 5 wrong passwords lock the email for 30 minutes, 20 tries per address.
-  if (!(await hit("admin-login-ip", await clientIp(), 20, 30 * MINUTE)) || (await isLimited("admin-login-email", email, 5, 30 * MINUTE))) {
-    return { error: TOO_MANY, values };
-  }
-
-  const user = await db.user.findUnique({ where: { email } });
+  const ip = await clientIp();
+  const [ipOk, emailLimited, user] = await Promise.all([
+    hit("admin-login-ip", ip, 20, 30 * MINUTE),
+    isLimited("admin-login-email", email, 5, 30 * MINUTE),
+    db.user.findUnique({ where: { email } }),
+  ]);
+  if (!ipOk || emailLimited) return { error: TOO_MANY, values };
   const valid = await checkPassword(password, user?.passwordHash);
   if (!user || !valid || user.role !== "SUPER_ADMIN" || user.status !== "ACTIVE") {
     await hit("admin-login-email", email, 5, 30 * MINUTE);
     return { error: "Invalid administrator credentials.", values };
   }
 
-  await reset("admin-login-email", email);
-  await createSession("admin", user);
+  await Promise.all([reset("admin-login-email", email), createSession("admin", user)]);
   redirect("/admin");
 }
 

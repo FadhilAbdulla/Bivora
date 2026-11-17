@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { ArkError, MANUAL_MONEY_TYPES, loadArkConfig, postArkMoney, type ManualMoneyType } from "./ark/client";
+import { after } from "next/server";
 import { db } from "./db";
 import { sendArkMoneyEmail } from "./email";
 
@@ -46,6 +47,7 @@ async function send(id: string): Promise<MoneyResult> {
   const name = MANUAL_MONEY_TYPES[type];
 
   let arkTrxId: string | null = null;
+  let alreadyPosted = false;
   try {
     const config = await loadArkConfig();
     arkTrxId = await postArkMoney(config, {
@@ -59,7 +61,8 @@ async function send(id: string): Promise<MoneyResult> {
   } catch (e) {
     if (!(e instanceof ArkError)) throw e;
     // A retry ARK has already seen: the first attempt went through.
-    if (!REFERENCE_USED.test(e.message)) {
+    alreadyPosted = REFERENCE_USED.test(e.message);
+    if (!alreadyPosted) {
       // No reply at all means ARK may or may not have it; anything else is a clear refusal.
       const unknown = /could not reach ark/i.test(e.message);
       await db.arkMoneyTransaction.update({ where: { id }, data: { status: unknown ? "CHECK" : "FAILED", error: e.message } });
@@ -70,6 +73,15 @@ async function send(id: string): Promise<MoneyResult> {
       };
     }
   }
+  // ARK said yes but sent no transaction number: not shown as done until ARK confirms it.
+  // A retry then either gets the number or hears "reference already used", which confirms it.
+  if (!arkTrxId && !alreadyPosted) {
+    await db.arkMoneyTransaction.update({
+      where: { id },
+      data: { status: "CHECK", error: "ARK didn't confirm a transaction number. Retry to confirm it: it can never post twice." },
+    });
+    return { error: "ARK didn't confirm this transaction. It's marked Not confirmed by ARK: use Retry to confirm it, it can never post twice." };
+  }
   await db.arkMoneyTransaction.update({ where: { id }, data: { status: "DONE", error: null, ...(arkTrxId && { arkTrxId }) } });
   // Shown on the client's page at once; ARK's report brings the same row later and is skipped.
   if (arkTrxId) {
@@ -79,14 +91,17 @@ async function send(id: string): Promise<MoneyResult> {
     });
   }
 
-  try {
-    await sendArkMoneyEmail(row.user, { type, amount, note: row.comment });
-    await db.arkMoneyTransaction.update({ where: { id }, data: { emailSentAt: new Date() } });
-  } catch (e) {
-    console.error("ARK money email failed", id, e instanceof Error ? e.message : "");
-    return { warning: `${name} posted to ARK, but the email to the client didn't send.` };
-  }
-  return { success: `${name} posted to ARK and the client was emailed.` };
+  // Sent after the reply, so the admin sees the result as soon as ARK has it. A confirmed retry was already emailed.
+  if (row.emailSentAt) return { success: `${name} is confirmed in ARK.` };
+  after(async () => {
+    try {
+      await sendArkMoneyEmail(row.user, { type, amount, note: row.comment });
+      await db.arkMoneyTransaction.update({ where: { id }, data: { emailSentAt: new Date() } });
+    } catch (e) {
+      console.error("ARK money email failed", id, e instanceof Error ? e.message : "");
+    }
+  });
+  return { success: `${name} posted to ARK. The client is being emailed.` };
 }
 
 /** Records and posts a new transaction. `key` comes from the form, so a double submit is one row. */

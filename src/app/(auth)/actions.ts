@@ -70,11 +70,13 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
 
   const { email, password } = parsed.data;
   // 5 wrong passwords lock an email for 15 minutes; one address can't try more than 30 times.
-  if (!(await hit("login-ip", await clientIp(), 30, 15 * MINUTE)) || (await isLimited("login-email", email, 5, 15 * MINUTE))) {
-    return { error: TOO_MANY, values };
-  }
-
-  const user = await db.user.findUnique({ where: { email } });
+  const ip = await clientIp();
+  const [ipOk, emailLimited, user] = await Promise.all([
+    hit("login-ip", ip, 30, 15 * MINUTE),
+    isLimited("login-email", email, 5, 15 * MINUTE),
+    db.user.findUnique({ where: { email } }),
+  ]);
+  if (!ipOk || emailLimited) return { error: TOO_MANY, values };
   if (user?.role === "USER" && !user.passwordHash) {
     return {
       error: "You signed up with Google and haven't saved a password. Use Forgot password to set one, or sign in with Google.",
@@ -91,8 +93,7 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
     return { error: "Your account is suspended. Please contact support.", values };
   }
 
-  await reset("login-email", email);
-  await createSession("client", user);
+  await Promise.all([reset("login-email", email), createSession("client", user)]);
   redirect((await returnPath()) ?? "/dashboard");
 }
 

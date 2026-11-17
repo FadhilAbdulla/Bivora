@@ -52,6 +52,7 @@ type Envelope<T> = { data?: T; message?: string; success?: boolean; httpStatus?:
 
 async function arkFetch<T>(config: ArkConfig, path: string, init: RequestInit & { token?: string }) {
   const { token, ...rest } = init;
+  const started = Date.now();
   let response: Response;
   try {
     response = await fetch(`${config.apiUrl.replace(/\/$/, "")}${path}`, {
@@ -64,6 +65,8 @@ async function arkFetch<T>(config: ArkConfig, path: string, init: RequestInit & 
     throw new ArkError("Could not reach ARK.");
   }
   const body: Envelope<T> | null = await response.json().catch(() => null);
+  const ms = Date.now() - started;
+  if (ms > 1500) console.warn(`Slow ARK call: ${rest.method ?? "GET"} ${path.split("?")[0].replace(/\/\d+/g, "/:id")} took ${ms} ms`);
   return {
     ok: response.ok && body?.success !== false,
     // ARK sometimes reports errors inside a 200 reply.
@@ -83,7 +86,19 @@ async function loginDealer(config: ArkConfig) {
     }),
   });
   if (!result.ok || !result.data?.token) throw new ArkError(`ARK login failed: ${result.message ?? result.status}`);
+  console.log(`ARK dealer login: new session${tokenLifetime(result.data.token)}`);
   return result.data.token;
+}
+
+/** How long ARK's token says it lasts, for the log (never the token itself). */
+function tokenLifetime(token: string) {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"));
+    if (typeof payload?.exp === "number") return `, ARK token expires in ${Math.round((payload.exp * 1000 - Date.now()) / 60_000)} min`;
+  } catch {
+    // Not a JWT: ARK keeps the expiry to itself.
+  }
+  return "";
 }
 
 // ---------- Session ----------
@@ -150,13 +165,13 @@ async function loginOnce(config: ArkConfig) {
     const usedAt = new Date();
     await db.arkSettings.update({
       where: { id: "ark" },
-      data: { sessionTokenEnc: encryptSecret(token), sessionUsedAt: usedAt, sessionLoginAt: null },
+      data: { sessionTokenEnc: encryptSecret(token), sessionUsedAt: usedAt, sessionLoginAt: null, sessionLoginFailedAt: null },
     });
     remember({ token, usedAt });
     lastTouch = Date.now();
     return token;
   } catch (e) {
-    await db.arkSettings.update({ where: { id: "ark" }, data: { sessionLoginAt: null } });
+    await db.arkSettings.update({ where: { id: "ark" }, data: { sessionLoginAt: null, ...(e instanceof ArkError && /login failed/i.test(e.message) && { sessionLoginFailedAt: new Date() }) } });
     throw e;
   }
 }
@@ -207,27 +222,45 @@ export async function connectArk(config: ArkConfig) {
   await loginOnce(config);
 }
 
+/** After ARK refuses the dealer login, the heartbeat waits this long before trying again. */
+const LOGIN_RETRY_MS = 60 * 60_000;
+
 /**
- * Keeps the saved session open. Never logs in: if there is no session, the next real request
- * makes one, so a wrong password can't trigger a login every 10 minutes.
+ * Keeps the shared session open, so pages never wait for a login. With no live session it signs
+ * in once, unless ARK refused the login within the last hour (a wrong password can't be retried
+ * every 10 minutes; saving ARK settings clears that).
  */
-export async function arkHeartbeat(): Promise<"ok" | "no-session" | "ended"> {
+export async function arkHeartbeat(): Promise<"ok" | "logged-in" | "no-settings" | "login-paused" | "ended"> {
   const saved = await db.arkSettings.findUnique({ where: { id: "ark" } });
-  if (!saved) return "no-session";
+  if (!saved) return "no-settings";
   const s = await storedSession(true);
-  if (!s || !isLive(s)) return "no-session";
   const config = await loadArkConfig();
-  const result = await arkFetch(config, "/admin/public/api/v2/heartbeat", { method: "GET", token: s.token });
-  if (isAuthFailure(result)) {
-    await db.arkSettings.updateMany({ where: { id: "ark", sessionUsedAt: s.usedAt }, data: { sessionTokenEnc: null, sessionUsedAt: null } });
-    forgetArkSession();
-    return "ended";
+  if (!s || !isLive(s)) {
+    if (saved.sessionLoginFailedAt && Date.now() - saved.sessionLoginFailedAt.getTime() < LOGIN_RETRY_MS) return "login-paused";
+    await loginOnce(config);
+    return "logged-in";
   }
-  if (!result.ok) throw new ArkError(`ARK heartbeat failed: ${result.message ?? result.status}`);
-  const usedAt = new Date();
-  await db.arkSettings.update({ where: { id: "ark" }, data: { sessionUsedAt: usedAt } });
-  remember({ token: s.token, usedAt });
-  return "ok";
+  const result = await arkFetch(config, "/admin/public/api/v2/heartbeat", { method: "GET", token: s.token });
+  const keep = async () => {
+    const usedAt = new Date();
+    await db.arkSettings.update({ where: { id: "ark" }, data: { sessionUsedAt: usedAt } });
+    remember({ token: s.token, usedAt });
+    return "ok" as const;
+  };
+  if (result.ok) return keep();
+
+  // Check with a real request before giving the session up: only the heartbeat address may be refusing.
+  const check = await arkFetch(config, `/admin/public/api/v2/username/${encodeURIComponent(config.dealerUsername)}`, { method: "GET", token: s.token });
+  if (!isAuthFailure(check)) {
+    console.warn(`ARK heartbeat: the heartbeat address answered ${result.status} ${result.message ?? ""}; the session still works, kept it`);
+    return keep();
+  }
+  // ARK really ended it: sign in again now, so the next page doesn't have to.
+  await db.arkSettings.updateMany({ where: { id: "ark", sessionUsedAt: s.usedAt }, data: { sessionTokenEnc: null, sessionUsedAt: null } });
+  forgetArkSession();
+  console.warn(`ARK heartbeat: ARK ended the session (${result.status} ${result.message ?? ""}), signing in again`);
+  await loginOnce(config);
+  return "ended";
 }
 
 type ArkUser = {

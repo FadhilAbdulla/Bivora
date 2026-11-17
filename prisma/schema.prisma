@@ -167,6 +167,8 @@ model ArkSettings {
   sessionTokenEnc    String?
   sessionUsedAt      DateTime?
   sessionLoginAt     DateTime?
+  // When ARK last refused the dealer login; the heartbeat doesn't try again for a while after it.
+  sessionLoginFailedAt DateTime?
   updatedAt          DateTime @updatedAt
 }
 

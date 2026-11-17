@@ -1,5 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { db } from "./db";
 import { canEditKyc } from "./kyc";
 import { readSession } from "./session";
@@ -10,17 +11,22 @@ import type { SessionKind } from "./session-token";
 
 const ROLE_FOR: Record<SessionKind, string> = { client: "USER", admin: "SUPER_ADMIN" };
 
-async function resolve(kind: SessionKind) {
+// Cached per request: the layout, the page and each section share one database lookup.
+const resolve = cache(async (kind: SessionKind) => {
   const session = await readSession(kind);
   if (!session) return { user: null, hasSession: false };
 
+  const started = Date.now();
   const user = await db.user.findUnique({ where: { id: session.userId } });
+  const ms = Date.now() - started;
+  // Usually a few milliseconds; seconds here mean the database connection is the slow part.
+  if (ms > 1000) console.warn(`Slow database: user lookup took ${ms} ms`);
   // Sessions signed before a password change or suspension carry an older version.
   if (!user || user.status !== "ACTIVE" || user.role !== ROLE_FOR[kind] || (session.v ?? 0) !== user.sessionVersion) {
     return { user: null, hasSession: true };
   }
   return { user, hasSession: true };
-}
+});
 
 async function requireFor(kind: SessionKind, loginPath: string) {
   const { user, hasSession } = await resolve(kind);

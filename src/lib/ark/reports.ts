@@ -62,8 +62,25 @@ async function get(config: ArkConfig, path: string) {
   return result.data;
 }
 
-/** The highest node the dealer can see: walk up from the dealer's own account. */
+// The top node never changes on its own, so each server remembers it for a while instead of
+// asking ARK 3-5 times on every view. A change of ARK settings gives a different key.
+const TOP_MS = 30 * 60_000;
+const topMemory = new Map<string, { top: number; at: number }>();
+
+/** The highest node the dealer can see. */
 async function findTopNode(config: ArkConfig) {
+  const key = [config.apiUrl, config.companyName, config.dealerUsername, config.parentId].join("|");
+  // ARK_CACHE_SECONDS=0 turns every saved ARK reply off, this one too.
+  const remember = process.env.ARK_CACHE_SECONDS !== "0";
+  const saved = remember ? topMemory.get(key) : undefined;
+  if (saved && Date.now() - saved.at < TOP_MS) return saved.top;
+  const top = await walkToTopNode(config);
+  topMemory.set(key, { top, at: Date.now() });
+  return top;
+}
+
+/** Walks up from the dealer's own account to the highest node it can see. */
+async function walkToTopNode(config: ArkConfig) {
   const dealer = rowsOf(
     await get(config, `/admin/public/api/v2/username/${encodeURIComponent(config.dealerUsername)}`).catch(() => null),
   )[0];
