@@ -7,6 +7,7 @@ import { toast } from "@/components/toast";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import type { FormState } from "@/lib/form";
 import { changeAdminPassword, createAdmin, setUserStatus } from "../actions";
+import { PasswordInput } from "@/components/password-input";
 
 const PASSWORD_HINT = "At least 12 characters, with a letter and a number.";
 
@@ -59,7 +60,7 @@ function AddAdminForm({ onClose }: { onClose: () => void }) {
           <Input name="email" type="email" required autoComplete="off" defaultValue={v.email} />
         </Field>
         <Field label="Password" hint={PASSWORD_HINT}>
-          <Input name="password" type="password" required minLength={12} autoComplete="new-password" />
+          <PasswordInput name="password" required minLength={12} autoComplete="new-password" />
         </Field>
       </div>
       <ModalFooter>
@@ -94,13 +95,13 @@ function ChangeAdminPasswordForm({ onClose }: { onClose: () => void }) {
       <div className="space-y-4 p-5">
         {state?.error && <Alert tone="error">{state.error}</Alert>}
         <Field label="Current password">
-          <Input name="currentPassword" type="password" required autoComplete="current-password" />
+          <PasswordInput name="currentPassword" required autoComplete="current-password" />
         </Field>
         <Field label="New password" hint={PASSWORD_HINT}>
-          <Input name="newPassword" type="password" required minLength={12} autoComplete="new-password" />
+          <PasswordInput name="newPassword" required minLength={12} autoComplete="new-password" />
         </Field>
         <Field label="Repeat new password">
-          <Input name="confirmPassword" type="password" required minLength={12} autoComplete="new-password" />
+          <PasswordInput name="confirmPassword" required minLength={12} autoComplete="new-password" />
         </Field>
       </div>
       <ModalFooter>

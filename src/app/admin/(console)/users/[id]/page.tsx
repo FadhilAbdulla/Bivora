@@ -17,6 +17,7 @@ import { AdminDocuments } from "./admin-documents";
 import { CreateArkButton } from "./create-ark";
 import { DemoSwitch } from "./demo-switch";
 import { ArkMoneySection, ArkMoneySectionLoading } from "./ark-money-section";
+import { bankCodeName } from "@/lib/bank";
 
 export const metadata: Metadata = { title: "Client" };
 
@@ -194,7 +195,7 @@ export default async function UserDetailPage({ params }: PageProps<"/admin/users
                     <p className="text-muted">{a.accountHolder} · {a.currency}</p>
                     <p className="font-mono text-xs text-muted">Acc {a.accountNumber}</p>
                     {a.iban && <p className="font-mono text-xs text-muted">IBAN {a.iban}</p>}
-                    {a.swiftCode && <p className="font-mono text-xs text-muted">SWIFT {a.swiftCode}</p>}
+                    {a.swiftCode && <p className="font-mono text-xs text-muted">{bankCodeName(a.swiftCode)} {a.swiftCode}</p>}
                     {(a.branch || a.country) && <p className="text-xs text-muted">{[a.branch, a.country].filter(Boolean).join(", ")}</p>}
                   </li>
                 ))}

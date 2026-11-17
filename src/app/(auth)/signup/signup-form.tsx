@@ -5,6 +5,7 @@ import { Alert, Field, Input } from "@/components/ui";
 import { PhoneInput } from "@/components/phone-input";
 import { SubmitButton } from "@/components/submit-button";
 import { signup } from "../actions";
+import { PasswordInput } from "@/components/password-input";
 
 export function SignupForm() {
   const [state, action] = useActionState(signup, null);
@@ -26,7 +27,7 @@ export function SignupForm() {
       </Field>
       <PhoneInput defaultValue={v.phone} required openUp />
       <Field label="Password" hint="8+ characters, with a letter and a number.">
-        <Input name="password" type="password" autoComplete="new-password" required minLength={8} />
+        <PasswordInput name="password" autoComplete="new-password" required minLength={8} />
       </Field>
       <SubmitButton className="w-full" pendingText="Creating account…">
         Create account

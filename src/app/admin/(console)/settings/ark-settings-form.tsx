@@ -7,6 +7,7 @@ import { Alert, Button, Field, Input, Select } from "@/components/ui";
 import type { ArkChoice } from "@/lib/ark/reports";
 import type { FormState } from "@/lib/form";
 import { saveArkSettings, testArkConnection } from "./actions";
+import { PasswordInput } from "@/components/password-input";
 
 export type ArkFormValues = {
   apiUrl: string;
@@ -46,7 +47,7 @@ export function ArkSettingsForm({ saved, choices }: { saved: ArkFormValues | nul
           <Input name="dealerUsername" required autoComplete="off" defaultValue={v.dealerUsername} />
         </Field>
         <Field label="Dealer password" hint={saved ? "Saved and hidden. Leave blank to keep it." : "Stored encrypted."}>
-          <Input name="dealerPassword" type="password" required={!saved} autoComplete="new-password" placeholder={saved ? "••••••••" : undefined} />
+          <PasswordInput name="dealerPassword" required={!saved} autoComplete="new-password" placeholder={saved ? "••••••••" : undefined} />
         </Field>
       </div>
       {!saved ? (

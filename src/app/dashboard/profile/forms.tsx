@@ -8,6 +8,7 @@ import { toast } from "@/components/toast";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import type { FormState } from "@/lib/form";
 import { changePassword, updateProfile } from "../actions";
+import { PasswordInput } from "@/components/password-input";
 
 type ProfileValues = { firstName: string; lastName: string; email: string; phone: string; country: string };
 
@@ -93,13 +94,13 @@ function PasswordForm({ onClose }: { onClose: () => void }) {
       <div className="space-y-4 p-5">
         {state?.error && <Alert tone="error">{state.error}</Alert>}
         <Field label="Current password">
-          <Input name="currentPassword" type="password" autoComplete="current-password" required />
+          <PasswordInput name="currentPassword" autoComplete="current-password" required />
         </Field>
         <Field label="New password" hint="At least 8 characters, with a letter and a number.">
-          <Input name="newPassword" type="password" autoComplete="new-password" required minLength={8} />
+          <PasswordInput name="newPassword" autoComplete="new-password" required minLength={8} />
         </Field>
         <Field label="Confirm new password">
-          <Input name="confirmPassword" type="password" autoComplete="new-password" required minLength={8} />
+          <PasswordInput name="confirmPassword" autoComplete="new-password" required minLength={8} />
         </Field>
       </div>
       <ModalFooter>

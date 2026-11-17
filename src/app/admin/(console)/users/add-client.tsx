@@ -8,6 +8,7 @@ import { toast } from "@/components/toast";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import type { FormState } from "@/lib/form";
 import { createClient } from "../actions";
+import { PasswordInput } from "@/components/password-input";
 
 export function AddClientButton() {
   const [open, setOpen] = useState(false);
@@ -54,7 +55,7 @@ function AddClientForm({ onClose }: { onClose: () => void }) {
         </Field>
         <PhoneInput label="Mobile number" defaultValue={v.phone} required openUp />
         <Field label="Password" hint="8+ characters, with a letter and a number. The same password is used for their trading account.">
-          <Input name="password" type="password" required minLength={8} autoComplete="new-password" />
+          <PasswordInput name="password" required minLength={8} autoComplete="new-password" />
         </Field>
       </div>
       <ModalFooter>

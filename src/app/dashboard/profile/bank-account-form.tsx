@@ -67,8 +67,8 @@ function BankAccountForm({ onClose }: { onClose: () => void }) {
           <Input name="iban" defaultValue={v.iban} placeholder="AE07 0331 2345 6789 0123 456" className="font-mono" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="SWIFT / BIC">
-            <Input name="swiftCode" defaultValue={v.swiftCode} className="font-mono" />
+          <Field label="SWIFT / BIC or IFSC">
+            <Input name="swiftCode" defaultValue={v.swiftCode} className="font-mono" autoCapitalize="characters" />
           </Field>
           <Field label="Currency">
             <Select name="currency" defaultValue={v.currency ?? "USD"}>

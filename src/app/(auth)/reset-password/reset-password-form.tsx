@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useActionState } from "react";
 import { SubmitButton } from "@/components/submit-button";
-import { Alert, Field, Input } from "@/components/ui";
+import { Alert, Field } from "@/components/ui";
 import { resetPassword } from "../actions";
+import { PasswordInput } from "@/components/password-input";
 
 export function ResetPasswordForm() {
   const token = useSearchParams().get("token") ?? "";
@@ -16,10 +17,10 @@ export function ResetPasswordForm() {
       {state?.error && <Alert tone="error">{state.error}</Alert>}
       <input type="hidden" name="token" value={token} />
       <Field label="New password">
-        <Input name="password" type="password" autoComplete="new-password" required minLength={8} />
+        <PasswordInput name="password" autoComplete="new-password" required minLength={8} />
       </Field>
       <Field label="Repeat new password">
-        <Input name="confirmPassword" type="password" autoComplete="new-password" required minLength={8} />
+        <PasswordInput name="confirmPassword" autoComplete="new-password" required minLength={8} />
       </Field>
       <SubmitButton className="w-full" pendingText="Saving…">
         Save password

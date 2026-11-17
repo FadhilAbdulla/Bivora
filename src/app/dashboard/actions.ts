@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
-import { MAX_BANK_ACCOUNTS, formatBankAccount } from "@/lib/bank";
+import { IFSC, MAX_BANK_ACCOUNTS, SWIFT, formatBankAccount } from "@/lib/bank";
 import {
   DEPOSIT_METHODS,
   MAX_REQUEST_AMOUNT,
@@ -163,7 +163,7 @@ const bankAccountSchema = z
       .string()
       .trim()
       .transform((v) => v.toUpperCase())
-      .pipe(z.string().regex(/^([A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?)?$/, "Enter a valid SWIFT / BIC code.")),
+      .pipe(z.string().refine((v) => v === "" || SWIFT.test(v) || IFSC.test(v), "Enter a valid SWIFT / BIC code, or an IFSC code for an Indian bank (e.g. SBIN0070257).")),
     branch: z.string().trim().max(100),
     country: z.string().trim().max(60),
     currency: z.enum(["USD", "EUR", "GBP", "AED"], { error: "Choose a currency." }),

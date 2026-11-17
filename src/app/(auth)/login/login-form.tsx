@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import { Alert, Field, Input } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { login } from "../actions";
+import { PasswordInput } from "@/components/password-input";
 
 export function LoginForm() {
   const [state, action] = useActionState(login, null);
@@ -16,7 +17,7 @@ export function LoginForm() {
         <Input name="email" type="email" autoComplete="email" required defaultValue={state?.values?.email} />
       </Field>
       <Field label="Password">
-        <Input name="password" type="password" autoComplete="current-password" required />
+        <PasswordInput name="password" autoComplete="current-password" required />
       </Field>
       <div className="text-right">
         <Link href="/forgot-password" className="text-sm text-brand hover:underline">
