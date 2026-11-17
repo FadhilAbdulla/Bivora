@@ -33,7 +33,7 @@ export function AddBankAccountButton({
 /** The add-account pop-up on its own, for pages that open it from their own link. */
 export function AddBankAccountModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Modal open={open} onClose={onClose} title="Add bank account" description="Use an account in your own name. Withdrawals are paid here.">
+    <Modal open={open} onClose={onClose} title="Add bank account" description="Withdrawals are paid into this account.">
       <BankAccountForm onClose={onClose} />
     </Modal>
   );

@@ -222,6 +222,29 @@ export async function connectArk(config: ArkConfig) {
   await loginOnce(config);
 }
 
+/** The shared session as saved, for the health page (never the token). */
+export async function arkSessionStatus() {
+  const row = await db.arkSettings.findUnique({
+    where: { id: "ark" },
+    select: { sessionTokenEnc: true, sessionUsedAt: true, sessionLoginFailedAt: true },
+  });
+  if (!row) return null;
+  return {
+    hasSession: Boolean(row.sessionTokenEnc),
+    live: isLive(row.sessionUsedAt ? { usedAt: row.sessionUsedAt } : null) && Boolean(row.sessionTokenEnc),
+    usedAt: row.sessionUsedAt,
+    loginFailedAt: row.sessionLoginFailedAt,
+  };
+}
+
+/** One small ARK request on the shared session, timed (signs in first if there is no session). */
+export async function arkPing() {
+  const config = await loadArkConfig();
+  const started = Date.now();
+  const result = await arkRequest<unknown>(config, `/admin/public/api/v2/username/${encodeURIComponent(config.dealerUsername)}`, { method: "GET" });
+  return { ms: Date.now() - started, ok: result.ok, status: result.status, message: result.message };
+}
+
 /** After ARK refuses the dealer login, the heartbeat waits this long before trying again. */
 const LOGIN_RETRY_MS = 60 * 60_000;
 

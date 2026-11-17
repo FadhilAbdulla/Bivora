@@ -84,7 +84,8 @@ export function Modal({
               </svg>
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+          {/* flex-auto, not flex-1: Safari (every iPhone browser) sizes a 0% basis to nothing inside a sheet with no fixed height. */}
+          <div className="min-h-0 flex-auto overflow-y-auto">{children}</div>
         </>
       )}
     </dialog>
