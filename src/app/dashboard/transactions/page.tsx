@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
-import { AccountMoney } from "@/components/ark-account-money";
 import { FundRequestTable } from "@/components/fund-request-table";
 import { Card, CardHeader, EmptyState, PageHeader, Table, cn } from "@/components/ui";
+import { TRANSACTION_TYPES } from "@/lib/ark/reports";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatDate, formatMoney } from "@/lib/money";
@@ -11,27 +10,43 @@ export const metadata: Metadata = { title: "Transactions" };
 
 export default async function TransactionsPage() {
   const user = await requireUser();
-  const [requests, ledger] = await Promise.all([
+  // Only what was done in Bivora: no ARK request on this page.
+  const [requests, ledger, money] = await Promise.all([
     db.fundRequest.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 100 }),
     db.ledgerEntry.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 100 }),
+    // Money Bivora posted to the trading account, once ARK confirmed it.
+    db.arkMoneyTransaction.findMany({ where: { userId: user.id, status: "DONE" }, orderBy: { createdAt: "desc" }, take: 100 }),
   ]);
 
   return (
     <>
       <PageHeader title="Transactions" description="Money on your trading account, your requests and every change to your wallet balance." />
       {user.arkUserId && (
-        <div className="mb-6">
-          <Suspense
-            fallback={
-              <Card aria-busy>
-                <CardHeader title="Account money" description="Loading your trading account…" />
-                <div className="space-y-3 p-4 sm:p-5">{[0, 1, 2].map((i) => <div key={i} className="h-10 animate-pulse rounded-md bg-surface-2" />)}</div>
-              </Card>
-            }
-          >
-            <AccountMoney userId={user.id} arkUserId={user.arkUserId} currency={user.currency} />
-          </Suspense>
-        </div>
+        <Card className="mb-6 min-w-0">
+          <CardHeader title="Trading account money" description="Deposits, withdrawals, credit and bonuses Bivora made on your trading account." />
+          {money.length === 0 ? (
+            <EmptyState title="No money movements yet." />
+          ) : (
+            <ul className="divide-y divide-line">
+              {money.map((r) => {
+                const amount = Number(r.amount);
+                const out = r.type === 2 || r.type === 4 || (r.type === 5 && amount < 0);
+                return (
+                  <li key={r.id} className="flex items-center justify-between gap-4 px-4 py-3 text-sm sm:px-5">
+                    <div>
+                      <p className="font-medium">{TRANSACTION_TYPES[r.type] ?? "Transaction"}</p>
+                      <p className="text-xs text-muted">{formatDate(r.createdAt)}</p>
+                    </div>
+                    <p className={cn("shrink-0 font-mono font-medium tabular-nums", out ? "text-down" : "text-up")}>
+                      {out ? "−" : "+"}
+                      {formatMoney(Math.abs(amount), user.currency)}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
       )}
       <Card>
         <CardHeader title="Balance ledger" description="Credits and debits applied to your wallet." />

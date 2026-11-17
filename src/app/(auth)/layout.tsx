@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Logo, LogoMark } from "@/components/logo";
-import { MarketOverview } from "@/components/markets/tradingview";
+import { ASSET_CLASSES } from "@/lib/markets";
 
 export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
@@ -18,9 +18,18 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
                 Stocks, indices, commodities and metals — with every deposit and withdrawal tracked.
               </p>
             </div>
-            <div className="animate-enter overflow-hidden rounded-xl border border-line bg-background/70 p-2 backdrop-blur">
-              <MarketOverview className="h-[440px]" />
-            </div>
+            {/* Static on purpose: no TradingView widget here, so the login page loads fast. */}
+            <ul className="animate-enter grid grid-cols-2 gap-3">
+              {ASSET_CLASSES.map((c) => (
+                <li key={c.id} className="rounded-xl border border-line bg-background/70 p-4 backdrop-blur">
+                  <svg viewBox="0 0 24 24" className="size-5 text-brand" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d={c.icon} />
+                  </svg>
+                  <p className="mt-2 font-medium">{c.title}</p>
+                  <p className="mt-1 text-xs text-muted">{c.instruments.slice(0, 3).map((i) => i.label).join(" · ")}</p>
+                </li>
+              ))}
+            </ul>
             <p className="text-xs text-muted">Trading leveraged products carries a high level of risk.</p>
           </div>
         </aside>

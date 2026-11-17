@@ -21,14 +21,31 @@ function TradingViewWidget({
   useEffect(() => {
     const el = container.current;
     if (!el) return;
-    el.innerHTML = '<div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>';
-    const s = document.createElement("script");
-    s.src = `https://s3.tradingview.com/external-embedding/${script}.js`;
-    s.type = "text/javascript";
-    s.async = true;
-    s.innerHTML = json;
-    el.appendChild(s);
+    const mount = () => {
+      el.innerHTML = '<div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>';
+      const s = document.createElement("script");
+      s.src = `https://s3.tradingview.com/external-embedding/${script}.js`;
+      s.type = "text/javascript";
+      s.async = true;
+      s.innerHTML = json;
+      el.appendChild(s);
+    };
+    // TradingView's script and iframe are heavy: load each widget only once it's about to scroll into view.
+    let observer: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver === "undefined") mount();
+    else {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((e) => e.isIntersecting)) return;
+          observer?.disconnect();
+          mount();
+        },
+        { rootMargin: "200px" },
+      );
+      observer.observe(el);
+    }
     return () => {
+      observer?.disconnect();
       el.innerHTML = "";
     };
   }, [script, json]);

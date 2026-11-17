@@ -58,6 +58,10 @@ model User {
   arkMoney         ArkMoneyTransaction[] @relation("arkMoneyClient")
   arkMoneyMade     ArkMoneyTransaction[] @relation("arkMoneyAdmin")
   arkTransactions  ArkTransaction[]
+
+  // Matching ARK rows to clients and checking usernames.
+  @@index([arkUserId])
+  @@index([arkUsername])
 }
 
 // type:   DEPOSIT | WITHDRAWAL
@@ -76,6 +80,8 @@ model FundRequest {
   // Withdrawal: the trading account (ARK username) the money comes from.
   tradingAccount String?
   userNote      String?
+  // ARK's transaction number once an approval is posted to the trading account.
+  arkTrxId      String?
   status        String    @default("PENDING")
   adminNote     String?
   reviewedById  String?
@@ -216,6 +222,8 @@ model ArkMoneyTransaction {
 
   @@index([createdAt])
   @@index([userId, createdAt])
+  // "Not completed in ARK" lists and the client's confirmed money.
+  @@index([status, createdAt])
 }
 
 // A copy of every ARK money transaction on a Bivora client's ARK account, whether it was made in

@@ -42,7 +42,10 @@ async function review(
 }
 
 export async function approveRequest(_prev: FormState, formData: FormData) {
-  return review(formData, approveFundRequest, "Approved.");
+  const result = await review(formData, approveFundRequest, "Approved and posted to the client's ARK account.");
+  // The money is now in ARK: admin money views ask ARK again.
+  if (result?.success) await clearArkCache(["money", "clientMoney"]);
+  return result;
 }
 
 export async function rejectRequest(_prev: FormState, formData: FormData) {

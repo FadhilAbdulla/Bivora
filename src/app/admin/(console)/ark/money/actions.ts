@@ -19,7 +19,7 @@ export async function addArkMoney(_prev: MoneyFormState, formData: FormData): Pr
     note: String(formData.get("note") ?? ""),
   });
   // The new transaction should show in ARK's money lists straight away; other ARK pages keep their copy.
-  await clearArkCache(["money", "clientMoney", "clientAccount"]);
+  await clearArkCache(["money", "clientMoney"]);
   refresh();
   // Keep what was typed when it didn't go through, so it can be fixed and sent again.
   return result.error && !result.recorded ? { ...result, values: formValues(formData, ["key"]) } : result;
@@ -28,7 +28,7 @@ export async function addArkMoney(_prev: MoneyFormState, formData: FormData): Pr
 export async function retryArkMoney(id: string): Promise<MoneyResult> {
   await requireAdmin();
   const result = await retryManualMoney(id);
-  await clearArkCache(["money", "clientMoney", "clientAccount"]);
+  await clearArkCache(["money", "clientMoney"]);
   refresh();
   return result;
 }

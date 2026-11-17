@@ -17,7 +17,6 @@ import {
   getArkMoney,
   isBivoraTransaction,
   saveArkTransactions,
-  nameOf,
   parentIdOf,
   transactionIdOf,
   transactionTypeOf,
@@ -191,7 +190,6 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
     );
   }
 
-  const names = new Map((result.clients.data?.rows ?? []).map((c) => [userIdOf(c)!, c]));
   const references = new Set(result.bivoraReferences);
   // Keep a copy of Bivora clients' rows, so each client's page shows them.
   await saveArkTransactions(result.rows, references);
@@ -212,9 +210,6 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
           description={`${from} to ${to}, newest first${before ? ", older page" : ""}.`}
           action={before ? <PendingLink href={`/admin/ark/money?${new URLSearchParams(keep)}`} className={buttonClass("ghost")}>Newest</PendingLink> : undefined}
         />
-        {result.clients.error && (
-          <div className="px-4 pt-4 sm:px-5"><Alert tone="info">Client names couldn&apos;t be loaded: {result.clients.error}</Alert></div>
-        )}
         {shown.length === 0 ? (
           <EmptyState title="No money transactions for these filters." />
         ) : (
@@ -222,7 +217,6 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
             {shown.map(({ row, bivora }, i) => {
               const userId = userIdOf({ userId: row.userId, userID: row.userID });
               const client = userId !== undefined ? accounts.get(userId) : undefined;
-              const arkUser = userId !== undefined ? names.get(userId) : undefined;
               const typeId = transactionTypeOf(row);
               const amount = signed(row);
               const comment = typeof row.comment === "string" ? row.comment : typeof row.trxComment === "string" ? row.trxComment : "";
@@ -238,10 +232,10 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
                       {client ? (
                         <Link href={`/admin/users/${client.id}`} className="hover:text-brand">{client.name}</Link>
                       ) : (
-                        nameOf(arkUser ?? {}) || `ARK user ${userId ?? "?"}`
+                        `ARK user ${userId ?? "?"}`
                       )}
                       <span className="text-xs text-muted">
-                        {" "}· User {userId ?? "—"} · Office {parentIdOf(row) ?? (arkUser && parentIdOf(arkUser)) ?? "—"}
+                        {" "}· User {userId ?? "—"} · Office {parentIdOf(row) ?? "—"}
                       </span>
                     </p>
                     {comment && <p className="text-xs text-muted">{comment}</p>}

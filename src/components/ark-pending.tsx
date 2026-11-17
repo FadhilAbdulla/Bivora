@@ -12,8 +12,7 @@ export function ArkPendingNotice({ compact }: { compact?: boolean }) {
         <div className={compact ? "" : "mt-4"}>
           <p className="font-medium">Trading account connection pending</p>
           <p className="mt-1 text-sm text-muted">
-            Live balance, equity, open positions and trade history will appear here once your account is linked to our
-            trading platform.
+            Your balance, equity and margin will appear here once your account is linked to our trading platform.
           </p>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
-import { applyBalanceOperation, isArkConnected } from "./ark";
+import { ArkError, loadArkConfig, postArkMoney } from "./ark/client";
 import { isKycApproved } from "./kyc";
 
 export class FundError extends Error {}
@@ -78,65 +78,105 @@ export async function cancelFundRequest(userId: string, requestId: string) {
   if (count === 0) throw new FundError("This request can no longer be cancelled.");
 }
 
+const REFERENCE_USED = /reference already used/i;
+
+/**
+ * Approves a deposit or withdrawal and posts it to the client's ARK trading account: a deposit
+ * (trxType 1) or a withdrawal (trxType 2), with the FundRequest ID as ARK's requestReference.
+ *
+ * ARK is called inside the transaction, after the request row is claimed, so a client can't cancel
+ * it meanwhile and a refusal from ARK rolls the approval back. ARK refuses a reference it has seen,
+ * so approving again after a timeout or a lost commit can never post twice: "reference already
+ * used" means the first attempt went through.
+ */
 export async function approveFundRequest(
   requestId: string,
   adminId: string,
   adminNote?: string,
 ) {
-  await db.$transaction(async (tx) => {
-    const owner = await tx.fundRequest.findUnique({ where: { id: requestId }, select: { userId: true } });
-    if (!owner) throw new FundError("This request has already been reviewed.");
-    await lockClient(tx, owner.userId);
-    const request = await tx.fundRequest.findUnique({
-      where: { id: requestId },
-      include: { user: true },
-    });
-    if (!request || request.status !== "PENDING") {
-      throw new FundError("This request has already been reviewed.");
-    }
-    if (!isKycApproved(request.user.kycStatus)) {
-      throw new FundError("Approve this client's documents first.");
-    }
+  let config;
+  try {
+    config = await loadArkConfig();
+  } catch (e) {
+    if (e instanceof ArkError) throw new FundError(e.message);
+    throw e;
+  }
 
-    const isDeposit = request.type === "DEPOSIT";
-    const delta = isDeposit ? request.amount : request.amount.negated();
-
-    // Guard against a concurrent review of the same request.
-    const { count } = await tx.fundRequest.updateMany({
-      where: { id: requestId, status: "PENDING" },
-      data: {
-        status: "APPROVED",
-        reviewedById: adminId,
-        reviewedAt: new Date(),
-        adminNote: adminNote || null,
-      },
-    });
-    if (count === 0) throw new FundError("This request has already been reviewed.");
-
-    const user = await tx.user.update({
-      where: { id: request.userId },
-      data: { balance: { increment: delta } },
-    });
-
-    await tx.ledgerEntry.create({
-      data: {
-        userId: request.userId,
-        amount: delta,
-        balanceAfter: user.balance,
-        description: isDeposit ? "Deposit approved" : "Withdrawal approved",
-        fundRequestId: request.id,
-      },
-    });
-
-    // Runs last so a failed ARK call rolls the whole approval back.
-    if (isArkConnected() && request.user.arkAccountId) {
-      await applyBalanceOperation({
-        accountId: request.user.arkAccountId,
-        amount: delta.toNumber(),
-        comment: `${request.type} ${request.id}`,
+  await db.$transaction(
+    async (tx) => {
+      const owner = await tx.fundRequest.findUnique({ where: { id: requestId }, select: { userId: true } });
+      if (!owner) throw new FundError("This request has already been reviewed.");
+      await lockClient(tx, owner.userId);
+      const request = await tx.fundRequest.findUnique({
+        where: { id: requestId },
+        include: { user: { select: { kycStatus: true, arkUserId: true } } },
       });
-    }
-  });
+      if (!request || request.status !== "PENDING") {
+        throw new FundError("This request has already been reviewed.");
+      }
+      if (!isKycApproved(request.user.kycStatus)) {
+        throw new FundError("Approve this client's documents first.");
+      }
+      if (!request.user.arkUserId) {
+        throw new FundError("This client has no ARK trading account yet, so the money can't be posted.");
+      }
+
+      const isDeposit = request.type === "DEPOSIT";
+      const delta = isDeposit ? request.amount : request.amount.negated();
+
+      // Claimed first: the row stays locked until ARK answers, so a cancel or a second approval waits.
+      const { count } = await tx.fundRequest.updateMany({
+        where: { id: requestId, status: "PENDING" },
+        data: {
+          status: "APPROVED",
+          reviewedById: adminId,
+          reviewedAt: new Date(),
+          adminNote: adminNote || null,
+        },
+      });
+      if (count === 0) throw new FundError("This request has already been reviewed.");
+
+      const user = await tx.user.update({
+        where: { id: request.userId },
+        data: { balance: { increment: delta } },
+      });
+
+      await tx.ledgerEntry.create({
+        data: {
+          userId: request.userId,
+          amount: delta,
+          balanceAfter: user.balance,
+          description: isDeposit ? "Deposit approved" : "Withdrawal approved",
+          fundRequestId: request.id,
+        },
+      });
+
+      let arkTrxId: string | null = null;
+      try {
+        arkTrxId = await postArkMoney(config, {
+          arkUserId: request.user.arkUserId,
+          type: isDeposit ? 1 : 2,
+          amount: request.amount.toNumber(),
+          // Starts with "Bivora" so Money flow tags it as made in Bivora.
+          comment: `Bivora ${isDeposit ? "deposit" : "withdrawal"} ${request.id}`,
+          reference: request.id,
+        });
+      } catch (e) {
+        if (!(e instanceof ArkError)) throw e;
+        // A repeat of an approval ARK already has: it went through the first time.
+        if (!REFERENCE_USED.test(e.message)) {
+          throw new FundError(
+            /could not reach ark/i.test(e.message)
+              ? "ARK didn't answer, so the request is still pending. Approve it again: it can never post twice."
+              : `ARK refused this ${isDeposit ? "deposit" : "withdrawal"}: ${e.message.replace(/^ARK refused the transaction: /, "")}`,
+          );
+        }
+      }
+      if (arkTrxId) await tx.fundRequest.update({ where: { id: requestId }, data: { arkTrxId } });
+    },
+    // ARK can take a while (a sign-in plus the post), and the default 5 s would cut it off.
+    { maxWait: 10_000, timeout: 60_000 },
+  );
 }
 
 export async function rejectFundRequest(

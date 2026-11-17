@@ -299,7 +299,6 @@ export type ArkMoney =
       rows: ArkRow[];
       /** Pass as `before` for the next, older page; undefined when this is the last. */
       older?: number;
-      clients: Section<{ rows: ArkRow[]; capped: boolean }>;
       /** FundRequest and ArkMoneyTransaction IDs Bivora sent to ARK as requestReference. */
       bivoraReferences: string[];
     };
@@ -324,10 +323,8 @@ async function loadArkMoney(filters: MoneyFilters): Promise<ArkMoney> {
     ...(filters.type && { transactionTypeId: String(filters.type) }),
     ...(filters.before && { offset: String(filters.before) }),
   });
-  const [money, clients] = await Promise.all([
-    section(async () => rowsOf(await get(config, `/admin/public/api/v2/report/money/transaction/${node}?${query}`))),
-    section(() => listUsers(config, node, USER_TYPE.client)),
-  ]);
+  // Names come from Bivora's own clients (the page's bivoraAccounts), not ARK's client list.
+  const money = await section(async () => rowsOf(await get(config, `/admin/public/api/v2/report/money/transaction/${node}?${query}`)));
   if (money.error !== undefined) return { error: money.error };
   const rows = money.data;
 
@@ -344,7 +341,6 @@ async function loadArkMoney(filters: MoneyFilters): Promise<ArkMoney> {
     node,
     rows,
     older: rows.length === MONEY_PAGE && ids.length ? Math.min(...ids) : undefined,
-    clients,
     bivoraReferences: known.map((k) => k.id),
   };
 }
