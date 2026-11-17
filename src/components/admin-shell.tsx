@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { LogoMark } from "./logo";
 import { MobileNav } from "./mobile-nav";
 import { NavLinkList, NavLinks, type NavItem } from "./nav-links";
+import { RefreshOnRevisit } from "./refresh-on-revisit";
 import { Toaster } from "./toast";
 import { Skeleton } from "./ui";
 
@@ -59,6 +60,9 @@ export function AdminShell({ nav, children }: { nav: NavItem[]; children: ReactN
         </header>
         <main className="flex-1 px-4 py-6 sm:px-8 sm:py-8">{children}</main>
         <Toaster />
+      <Suspense fallback={null}>
+        <RefreshOnRevisit />
+      </Suspense>
       </div>
     </div>
   );

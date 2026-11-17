@@ -36,6 +36,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    // Pages a visitor has opened stay on their device for 5 minutes, so going back to one shows it
+    // straight away; RefreshOnRevisit then fetches fresh data in the background. Any change made
+    // through a form refreshes the data at once, whatever this says.
+    staleTimes: { dynamic: 300 },
+  },
   poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
