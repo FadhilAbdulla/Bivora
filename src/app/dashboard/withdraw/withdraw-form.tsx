@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { Alert, Button, Field, Input, Select, Textarea } from "@/components/ui";
 import { MIN_WITHDRAWAL, WITHDRAWAL_METHODS } from "@/lib/constants";
-import { AddBankAccountButton } from "../profile/bank-account-form";
+import { AddBankAccountModal } from "../profile/bank-account-form";
 import { requestWithdrawal } from "../actions";
 
 type Choice = { id: string; label: string };
@@ -20,6 +20,12 @@ export function WithdrawForm({
   // The submit button sits outside the form (see below), so it reads the pending state from here.
   const [state, action, pending] = useActionState(requestWithdrawal, null);
   const v = state?.values ?? {};
+  const [addingBank, setAddingBank] = useState(false);
+  const addBankLink = (text: string) => (
+    <button type="button" onClick={() => setAddingBank(true)} className="font-medium text-brand hover:underline">
+      {text}
+    </button>
+  );
   const [bankAccountId, setBankAccountId] = useState<string>(v.bankAccountId ?? bankAccounts[0]?.id ?? "");
   // A bank account added just now comes in with the page refresh: choose it if nothing valid is chosen.
   const chosenBank = bankAccounts.some((a) => a.id === bankAccountId) ? bankAccountId : (bankAccounts[0]?.id ?? "");
@@ -66,7 +72,9 @@ export function WithdrawForm({
         ) : (
           <div className="space-y-1.5">
             <span className="block text-sm font-medium">Bank account</span>
-            <Alert tone="info">Add the bank account to pay this withdrawal into.</Alert>
+            <Alert tone="info">
+              {canAddBank ? addBankLink("Add the bank account") : "Add the bank account"} to pay this withdrawal into.
+            </Alert>
           </div>
         )}
 
@@ -75,14 +83,9 @@ export function WithdrawForm({
         </Field>
       </form>
 
+      {canAddBank && bankAccounts.length > 0 && <p className="-mt-2 text-sm">{addBankLink("Add another bank account")}</p>}
       {/* Outside the withdrawal form: the bank account pop-up has a form of its own. */}
-      {canAddBank && (
-        <AddBankAccountButton
-          label={bankAccounts.length ? "Add another bank account" : "Add bank account"}
-          variant={bankAccounts.length ? "ghost" : "secondary"}
-          className={bankAccounts.length ? "-mt-2 px-0 text-brand hover:bg-transparent" : "w-full"}
-        />
-      )}
+      <AddBankAccountModal open={addingBank} onClose={() => setAddingBank(false)} />
 
       <Button type="submit" form="withdraw" className="w-full" disabled={pending || bankAccounts.length === 0}>
         {pending ? "Submitting…" : "Request withdrawal"}
