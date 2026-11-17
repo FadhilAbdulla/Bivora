@@ -41,8 +41,8 @@ const depositSchema = z.object({
 const withdrawalSchema = z.object({
   amount: amount(MIN_WITHDRAWAL),
   method: z.enum(methodValues(WITHDRAWAL_METHODS), { error: "Choose a payout method." }),
-  bankAccountId: z.string().optional(),
-  payoutDetails: z.string().trim().max(500).optional(),
+  bankAccountId: z.string({ error: "Add a bank account first." }).min(1, "Add a bank account first."),
+  tradingAccount: z.string({ error: "Choose a trading account." }).min(1, "Choose a trading account."),
   userNote: z.string().trim().max(500).optional(),
 });
 
@@ -66,21 +66,15 @@ export async function requestWithdrawal(_prev: FormState, formData: FormData): P
   if (!isKycApproved(user.kycStatus)) return { error: NOT_APPROVED, values };
   const parsed = withdrawalSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message, values };
-  const { bankAccountId, ...data } = parsed.data;
+  const { bankAccountId, tradingAccount, ...data } = parsed.data;
 
-  // A saved bank account is resolved server-side so the payout destination
-  // always comes from the client's own stored details.
-  if (data.method === "BANK_TRANSFER" && bankAccountId && bankAccountId !== "manual") {
-    const account = await db.bankAccount.findFirst({ where: { id: bankAccountId, userId: user.id } });
-    if (!account) return { error: "Choose one of your saved bank accounts.", values };
-    data.payoutDetails = formatBankAccount(account);
-  }
-  if (!data.payoutDetails || data.payoutDetails.length < 5) {
-    return { error: "Enter your payout details.", values };
-  }
+  // Only the client's own trading account and saved bank accounts are accepted, looked up here.
+  if (!user.arkUsername || tradingAccount !== user.arkUsername) return { error: "Choose one of your trading accounts.", values };
+  const account = await db.bankAccount.findFirst({ where: { id: bankAccountId, userId: user.id } });
+  if (!account) return { error: "Choose one of your saved bank accounts.", values };
 
   try {
-    await createFundRequest({ userId: user.id, type: "WITHDRAWAL", ...data });
+    await createFundRequest({ userId: user.id, type: "WITHDRAWAL", ...data, tradingAccount, payoutDetails: formatBankAccount(account) });
   } catch (e) {
     if (e instanceof FundError) return { error: e.message, values };
     throw e;

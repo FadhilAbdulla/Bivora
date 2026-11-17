@@ -8,12 +8,22 @@ import { Alert, Button, Field, Input, Select } from "@/components/ui";
 import type { FormState } from "@/lib/form";
 import { addBankAccount, deleteBankAccount, setDefaultBankAccount } from "../actions";
 
-export function AddBankAccountButton({ disabled }: { disabled?: boolean }) {
+export function AddBankAccountButton({
+  disabled,
+  label = "Add account",
+  variant,
+  className,
+}: {
+  disabled?: boolean;
+  label?: string;
+  variant?: "primary" | "secondary" | "ghost";
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button onClick={() => setOpen(true)} disabled={disabled}>
-        Add account
+      <Button type="button" onClick={() => setOpen(true)} disabled={disabled} variant={variant} className={className}>
+        {label}
       </Button>
       <Modal
         open={open}

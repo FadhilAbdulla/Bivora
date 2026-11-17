@@ -2,21 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CancelRequestButton } from "@/components/cancel-request-button";
 import { FundRequestTable } from "@/components/fund-request-table";
-import { Alert, Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
+import { Alert, Card, CardHeader, PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getAvailableBalance } from "@/lib/funds";
 import { isKycApproved } from "@/lib/kyc";
-import { maskAccountNumber } from "@/lib/bank";
-import { formatMoney } from "@/lib/money";
+import { MAX_BANK_ACCOUNTS, maskAccountNumber } from "@/lib/bank";
 import { WithdrawForm } from "./withdraw-form";
 
 export const metadata: Metadata = { title: "Withdraw" };
 
 export default async function WithdrawPage() {
   const user = await requireUser();
-  const [{ balance, available, pendingWithdrawals }, requests, bankAccounts] = await Promise.all([
-    getAvailableBalance(user.id),
+  const [requests, bankAccounts] = await Promise.all([
     db.fundRequest.findMany({
       where: { userId: user.id, type: "WITHDRAWAL" },
       orderBy: { createdAt: "desc" },
@@ -28,14 +25,14 @@ export default async function WithdrawPage() {
     }),
   ]);
 
+  // Every trading account the client has; today that's their one ARK account.
+  const tradingAccounts = user.arkUserId && user.arkUsername
+    ? [{ id: user.arkUsername, label: `${user.arkUsername} · ${user.arkIsDemo ? "Demo" : "Real"}` }]
+    : [];
+
   return (
     <>
-      <PageHeader title="Withdraw funds" description="Request a payout from your wallet. Withdrawals are reviewed before they're sent." />
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Wallet balance" value={formatMoney(balance, user.currency)} />
-        <StatCard label="Pending withdrawals" value={formatMoney(pendingWithdrawals, user.currency)} />
-        <StatCard label="Available to withdraw" value={formatMoney(available, user.currency)} tone="brand" />
-      </div>
+      <PageHeader title="Withdraw funds" description="Request a payout from your trading account to your bank. Withdrawals are reviewed before they're sent." />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,24rem)_1fr]">
         <Card>
           <CardHeader title="New withdrawal" />
@@ -49,9 +46,14 @@ export default async function WithdrawPage() {
                 Your withdrawal is waiting for review. You can request another once it is approved, rejected or cancelled.
               </Alert>
             </div>
+          ) : tradingAccounts.length === 0 ? (
+            <div className="p-5">
+              <Alert tone="info">Your trading account is still being set up. You can withdraw once it&apos;s ready.</Alert>
+            </div>
           ) : (
             <WithdrawForm
-              available={available.toFixed(2)}
+              tradingAccounts={tradingAccounts}
+              canAddBank={bankAccounts.length < MAX_BANK_ACCOUNTS}
               bankAccounts={bankAccounts.map((a) => ({
                 id: a.id,
                 label: `${a.bankName} · ${maskAccountNumber(a.accountNumber)}${a.isDefault ? " (default)" : ""}`,

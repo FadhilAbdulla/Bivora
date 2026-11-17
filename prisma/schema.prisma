@@ -73,6 +73,8 @@ model FundRequest {
   // Deposit: payment reference / transaction hash. Withdrawal: payout destination.
   reference     String?
   payoutDetails String?
+  // Withdrawal: the trading account (ARK username) the money comes from.
+  tradingAccount String?
   userNote      String?
   status        String    @default("PENDING")
   adminNote     String?

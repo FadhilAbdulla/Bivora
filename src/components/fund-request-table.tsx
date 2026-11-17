@@ -49,6 +49,7 @@ export function FundRequestTable({
               )}
               <p className="text-muted">
                 {METHOD_LABELS[r.method] ?? r.method}
+                {r.tradingAccount && <span className="block text-xs">From trading account {r.tradingAccount}</span>}
                 {(r.reference || r.payoutDetails) && (
                   <span className="block text-xs [overflow-wrap:anywhere]">{r.reference ?? r.payoutDetails}</span>
                 )}
@@ -88,6 +89,7 @@ export function FundRequestTable({
             {compact ? null : (
               <td>
                 <p>{METHOD_LABELS[r.method] ?? r.method}</p>
+                {r.tradingAccount && <p className="text-xs text-muted">From {r.tradingAccount}</p>}
                 {(r.reference || r.payoutDetails) && (
                   <p className="max-w-56 truncate text-xs text-muted" title={r.reference ?? r.payoutDetails ?? ""}>
                     {r.reference ?? r.payoutDetails}

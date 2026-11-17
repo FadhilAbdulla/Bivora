@@ -41,6 +41,7 @@ export async function createFundRequest(input: {
   method: string;
   reference?: string;
   payoutDetails?: string;
+  tradingAccount?: string;
   userNote?: string;
 }) {
   const amount = new Prisma.Decimal(input.amount);
@@ -53,10 +54,6 @@ export async function createFundRequest(input: {
       if (open > 0) {
         throw new FundError("You already have a withdrawal waiting for review. You can request another once it is approved, rejected or cancelled.");
       }
-      const { available } = await getAvailableBalance(input.userId, tx);
-      if (available.lessThan(amount)) {
-        throw new FundError("Amount exceeds your available balance.");
-      }
     }
     return tx.fundRequest.create({
       data: {
@@ -66,6 +63,7 @@ export async function createFundRequest(input: {
         method: input.method,
         reference: input.reference || null,
         payoutDetails: input.payoutDetails || null,
+        tradingAccount: input.tradingAccount || null,
         userNote: input.userNote || null,
       },
     });
@@ -102,10 +100,6 @@ export async function approveFundRequest(
 
     const isDeposit = request.type === "DEPOSIT";
     const delta = isDeposit ? request.amount : request.amount.negated();
-
-    if (!isDeposit && request.user.balance.lessThan(request.amount)) {
-      throw new FundError("User balance is too low to approve this withdrawal.");
-    }
 
     // Guard against a concurrent review of the same request.
     const { count } = await tx.fundRequest.updateMany({
