@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Admin" };
 
 export default async function AdminPage() {
   await requireAdmin();
-  const [pending, clients, balances, approved, queue, verifications] = await Promise.all([
+  const [pending, clients, approved, queue, verifications] = await Promise.all([
     db.fundRequest.groupBy({
       by: ["type"],
       where: { status: "PENDING" },
@@ -19,7 +19,6 @@ export default async function AdminPage() {
       _count: true,
     }),
     db.user.count({ where: { role: "USER" } }),
-    db.user.aggregate({ where: { role: "USER" }, _sum: { balance: true } }),
     db.fundRequest.groupBy({ by: ["type"], where: { status: "APPROVED" }, _sum: { amount: true } }),
     db.fundRequest.findMany({
       where: { status: "PENDING" },
@@ -35,7 +34,7 @@ export default async function AdminPage() {
 
   return (
     <>
-      <PageHeader title="Admin overview" description="Review pending fund requests and monitor client balances." />
+      <PageHeader title="Admin overview" description="Review pending fund requests and client verifications." />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Pending deposits"
@@ -49,7 +48,7 @@ export default async function AdminPage() {
           hint={formatMoney(pendingOf("WITHDRAWAL")?._sum.amount ?? 0)}
           tone={pendingOf("WITHDRAWAL") ? "warning" : undefined}
         />
-        <StatCard label="Client balances" value={formatMoney(balances._sum.balance ?? 0)} hint={`${clients} clients`} tone="brand" />
+        <StatCard label="Clients" value={clients.toLocaleString("en-US")} hint="Registered accounts" tone="brand" />
         <StatCard
           label="Total deposited"
           value={formatMoney(approvedOf("DEPOSIT"))}

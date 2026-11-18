@@ -14,6 +14,8 @@ export type NavItem = {
   tab?: string;
   /** Makes this item an expandable group; its own href is not used. */
   children?: NavItem[];
+  /** False for pages that do heavy work on the server (ARK calls, live checks): not loaded in advance. */
+  prefetch?: boolean;
 };
 
 const isActive = (item: NavItem, pathname?: string) =>
@@ -34,6 +36,7 @@ export function NavLinkList({ items, pathname }: { items: NavItem[]; pathname?: 
           <Link
             key={item.href}
             href={item.href}
+            prefetch={item.prefetch === false ? false : undefined}
             aria-current={active ? "page" : undefined}
             className={cn(
               "flex shrink-0 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
@@ -99,6 +102,7 @@ export function BottomTabList({ items, pathname }: { items: NavItem[]; pathname?
           <Link
             key={item.href}
             href={item.href}
+            prefetch={item.prefetch === false ? false : undefined}
             aria-current={active ? "page" : undefined}
             className={cn(
               "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",

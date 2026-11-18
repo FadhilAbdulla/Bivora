@@ -256,3 +256,19 @@ model ArkCache {
   // Set while one server refreshes this entry, so others don't do the same.
   refreshingAt DateTime?
 }
+
+// Every email Bivora sends, for the admin Emails page. The body is never kept: some emails carry login details.
+model EmailLog {
+  id         String   @id @default(cuid())
+  to         String
+  subject    String
+  // SENT or FAILED.
+  status     String
+  error      String?
+  // The email provider's (Resend) ID, to look a message up there.
+  providerId String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([to, createdAt])
+}

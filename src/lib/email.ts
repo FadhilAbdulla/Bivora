@@ -1,6 +1,7 @@
 import "server-only";
 import { after } from "next/server";
 import { siteUrl } from "./brand";
+import { db } from "./db";
 import { formatMoney } from "./money";
 
 // Transactional email through Resend. Swapping providers only means changing sendEmail().
@@ -22,14 +23,33 @@ export function sendLater(label: string, send: () => Promise<void>) {
 }
 
 async function sendEmail(message: { to: string; subject: string; html: string; text: string }) {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    cache: "no-store",
-    signal: AbortSignal.timeout(15_000),
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
-    body: JSON.stringify({ from: process.env.EMAIL_FROM, reply_to: SUPPORT, ...message }),
-  });
-  if (!response.ok) throw new Error(`Email provider returned ${response.status}`);
+  let providerId: string | null = null;
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+      body: JSON.stringify({ from: process.env.EMAIL_FROM, reply_to: SUPPORT, ...message }),
+    });
+    const body: { id?: string; message?: string } | null = await response.json().catch(() => null);
+    providerId = body?.id ?? null;
+    if (!response.ok) throw new Error(`Email provider returned ${response.status}${body?.message ? `: ${body.message}` : ""}`);
+  } catch (e) {
+    const error = e instanceof Error ? (e.name === "TimeoutError" ? "The email provider didn't answer in time." : e.message) : "Failed";
+    await logEmail(message, "FAILED", error, providerId);
+    throw e;
+  }
+  await logEmail(message, "SENT", null, providerId);
+}
+
+/** Records a send for the admin Emails page. A logging failure never affects the email itself. */
+async function logEmail(message: { to: string; subject: string }, status: "SENT" | "FAILED", error: string | null, providerId: string | null) {
+  try {
+    await db.emailLog.create({ data: { to: message.to, subject: message.subject.slice(0, 300), status, error: error?.slice(0, 500) ?? null, providerId } });
+  } catch (e) {
+    console.error("Email log failed", e instanceof Error ? e.message : "");
+  }
 }
 
 const escapeHtml = (value: string) =>

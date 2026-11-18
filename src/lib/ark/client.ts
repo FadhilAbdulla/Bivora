@@ -27,7 +27,19 @@ export type ArkConfig = {
 /** ARK's account currency for every Bivora client. Always 1 on this broker. */
 export const ARK_USER_CURRENCY_ID = 1;
 
+// Each ARK call needs the settings; pages make several, so each server keeps them briefly instead
+// of reading the database and decrypting the password every time. Saving settings clears this.
+const CONFIG_MS = 15_000;
+let configMemory: { config: ArkConfig; at: number } | null = null;
+
 export async function loadArkConfig(): Promise<ArkConfig> {
+  if (configMemory && Date.now() - configMemory.at < CONFIG_MS) return configMemory.config;
+  const config = await readArkConfig();
+  configMemory = { config, at: Date.now() };
+  return config;
+}
+
+async function readArkConfig(): Promise<ArkConfig> {
   const saved = await db.arkSettings.findUnique({ where: { id: "ark" } });
   if (!saved) throw new ArkError("Add the ARK connection details under ARK settings first.");
   const { dealerPasswordEnc, apiUrl, companyName, dealerUsername, parentId, genericPolicyId, currenciesPolicyId, tradingUrl } = saved;
@@ -126,6 +138,7 @@ const remember = (s: Session | null) => {
 /** Drops this server's copy of the session, e.g. after the ARK settings change. */
 export function forgetArkSession() {
   memory = null;
+  configMemory = null;
 }
 
 async function storedSession(fresh = false): Promise<Session | null> {

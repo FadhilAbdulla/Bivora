@@ -139,47 +139,6 @@ async function section<T>(work: () => Promise<T>): Promise<Section<T>> {
   }
 }
 
-export type ArkOverview =
-  | { error: string }
-  | {
-      top: number;
-      node: number;
-      /** ARK's own record for the top node, for its name. */
-      topInfo: ArkRow | null;
-      /** Offices under the top node, to switch between. */
-      offices: ArkChoice[];
-      clients: Section<{ rows: ArkRow[]; capped: boolean }>;
-    };
-
-/**
- * Client accounts under one office. With no office asked for, it opens on the office new clients
- * are created in (ARK settings), or everything under the top node when that office isn't listed.
- */
-async function loadArkOverview(requestedNode?: number): Promise<ArkOverview> {
-  let config: ArkConfig;
-  let top: number;
-  try {
-    config = await loadArkConfig();
-    // Signs in if there is no session yet, so a login error shows once instead of per report.
-    await ensureArkSession(config);
-    top = await findTopNode(config);
-  } catch (e) {
-    if (e instanceof ArkError) return { error: e.message };
-    throw e;
-  }
-  const [topInfo, officeList] = await Promise.all([
-    get(config, `/admin/public/api/v2/user/${top}`).then((d) => rowsOf(d)[0] ?? null, () => null),
-    listUsers(config, top, USER_TYPE.office).catch(() => null),
-  ]);
-  const offices = (officeList?.rows ?? [])
-    .filter((r) => userIdOf(r) !== top)
-    .map(officeChoice)
-    .sort((a, b) => a.label.localeCompare(b.label));
-  const node = requestedNode ?? (offices.some((o) => o.id === config.parentId) ? config.parentId : top);
-  const clients = await section(() => listUsers(config, node, USER_TYPE.client));
-  return { top, node, topInfo, offices, clients };
-}
-
 // ---------- Choices for ARK settings ----------
 
 export type ArkChoice = { id: number; label: string; group?: string };
@@ -257,16 +216,6 @@ export async function bivoraAccounts() {
   return new Map(users.map((u) => [Number(u.arkUserId), { id: u.id, name: `${u.firstName} ${u.lastName}`, email: u.email }]));
 }
 
-/** Matches Bivora's own fields first, then the marker Bivora puts in ARK (customData.bivoraUserId). */
-export function bivoraClientFor(row: ArkRow, accounts: Map<number, BivoraClient>) {
-  const id = userIdOf(row);
-  if (id !== undefined && accounts.has(id)) return accounts.get(id)!;
-  const custom = row.customData;
-  if (custom && typeof custom === "object" && typeof (custom as ArkRow).bivoraUserId === "string") {
-    return { id: (custom as ArkRow).bivoraUserId as string, name: nameOf(row), email: "" };
-  }
-  return null;
-}
 
 // ---------- Money transactions ----------
 
@@ -362,37 +311,6 @@ export const transactionTypeOf = (row: ArkRow) => pick(row, ["transactionTypeId"
 const timeOf = (row: ArkRow) =>
   [row.transactionTime, row.trxDate, row.createdDate].find((v): v is string => typeof v === "string" && v !== "")?.slice(0, 19).replace("T", " ") ?? "";
 
-/**
- * Keeps a copy of ARK money rows that belong to Bivora clients, so a client's page shows them.
- * Rows already saved are left alone (ARK's transaction ID is the key).
- */
-export async function saveArkTransactions(rows: ArkRow[], references: ReadonlySet<string> = new Set()) {
-  if (rows.length === 0) return 0;
-  const accounts = await bivoraAccounts();
-  const data = rows.flatMap((row) => {
-    const id = transactionIdOf(row);
-    const arkUserId = pick(row, ["userId", "userID"]);
-    const client = arkUserId !== undefined ? accounts.get(arkUserId) : undefined;
-    const type = transactionTypeOf(row);
-    if (id === undefined || !client || type === undefined) return [];
-    const comment = typeof row.comment === "string" ? row.comment : typeof row.trxComment === "string" ? row.trxComment : null;
-    const reference = typeof row.requestReference === "string" && row.requestReference ? row.requestReference : null;
-    return [{
-      id: String(id),
-      userId: client.id,
-      arkUserId: String(arkUserId),
-      type,
-      amount: amountOf(row),
-      comment: comment?.slice(0, 500) || null,
-      reference,
-      madeInBivora: isBivoraTransaction(row, references),
-      time: timeOf(row) || new Date().toISOString().slice(0, 19).replace("T", " "),
-    }];
-  });
-  if (data.length === 0) return 0;
-  const { count } = await db.arkTransaction.createMany({ data, skipDuplicates: true });
-  return count;
-}
 
 /** Every money transaction on one client's ARK account (newest 500), from ARK. */
 async function loadClientMoney(arkUserId: string): Promise<{ rows: ArkRow[]; references: string[] } | { error: string }> {
@@ -423,18 +341,13 @@ async function loadClientMoney(arkUserId: string): Promise<{ rows: ArkRow[]; ref
 // ---------- Cached reads ----------
 // Pages show the last good ARK reply at once and refresh it in the background: see ./cache.ts.
 
-/** One client's ARK money transactions, saved into Bivora as they arrive. */
-export async function syncClientArkMoney(arkUserId: string) {
-  const result = await arkCached("clientMoney", arkUserId, () => loadClientMoney(arkUserId));
-  if ("error" in result) return { error: result.error };
-  await saveArkTransactions(result.rows, new Set(result.references));
-  return {};
+/** One client's money transactions as ARK lists them, for the ARK history tab (asked only when opened). */
+export async function getClientArkMoney(arkUserId: string) {
+  return arkCached("clientMoney", arkUserId, () => loadClientMoney(arkUserId));
 }
 
-/** Client accounts under one office (the saved office by default). */
-export function getArkOverview(requestedNode?: number) {
-  return arkCached("overview", requestedNode ?? null, () => loadArkOverview(requestedNode));
-}
+/** A row's time as ARK writes it, for lists. */
+export const arkTimeOf = (row: ArkRow) => timeOf(row);
 
 /** Offices and client policies for the ARK settings dropdowns. */
 export function getArkChoices() {

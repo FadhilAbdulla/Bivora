@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { KycBanner } from "./kyc-banner";
 import { Logo } from "./logo";
 import { BottomTabList, BottomTabs, NavLinkList, NavLinks, type NavItem } from "./nav-links";
+import { NavProgress } from "./nav-progress";
 import { RefreshOnRevisit } from "./refresh-on-revisit";
 import { Toaster } from "./toast";
 import { Skeleton } from "./ui";
@@ -65,6 +66,7 @@ export function AppShell({ nav, children }: { nav: NavItem[]; children: ReactNod
         <Toaster />
       <Suspense fallback={null}>
         <RefreshOnRevisit />
+        <NavProgress />
       </Suspense>
       </div>
     </div>

@@ -40,7 +40,7 @@ export default async function WithdrawPage() {
             <div className="p-5">
               <Alert tone="info">You can withdraw once your documents are approved.</Alert>
             </div>
-          ) : requests.some((r) => r.status === "PENDING") ? (
+          ) : requests.some((r) => r.status === "PENDING" || r.status === "APPROVING") ? (
             <div className="p-5">
               <Alert tone="info">
                 Your withdrawal is waiting for review. You can request another once it is approved, rejected or cancelled.

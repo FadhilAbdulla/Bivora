@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { LogoMark } from "./logo";
 import { MobileNav } from "./mobile-nav";
 import { NavLinkList, NavLinks, type NavItem } from "./nav-links";
+import { NavProgress } from "./nav-progress";
 import { RefreshOnRevisit } from "./refresh-on-revisit";
 import { Toaster } from "./toast";
 import { Skeleton } from "./ui";
@@ -62,6 +63,7 @@ export function AdminShell({ nav, children }: { nav: NavItem[]; children: ReactN
         <Toaster />
       <Suspense fallback={null}>
         <RefreshOnRevisit />
+        <NavProgress />
       </Suspense>
       </div>
     </div>

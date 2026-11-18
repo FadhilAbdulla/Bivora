@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { kycStage } from "@/lib/kyc";
 import { formatDate, formatMoney } from "@/lib/money";
+import { PendingArea, PendingForm, PendingLink } from "@/components/pending-nav";
 import { QuickApprove } from "../kyc-review";
 import { AddClientButton } from "./add-client";
 
@@ -23,6 +24,8 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
           { email: { contains: query, mode: "insensitive" } },
           { firstName: { contains: query, mode: "insensitive" } },
           { lastName: { contains: query, mode: "insensitive" } },
+          { arkUsername: { contains: query, mode: "insensitive" } },
+          { phone: { contains: query.replace(/[\s-]/g, "") } },
         ],
       }),
     },
@@ -34,17 +37,18 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
     },
   });
 
+  // Searching swaps the list in place (with the loading bar) instead of reloading the whole page.
   return (
-    <>
+    <PendingArea>
       <PageHeader
         title="Clients"
         description="Every registered account, its balance and status."
         action={
           <div className="flex w-full gap-2 sm:w-auto">
-          <form className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
-            <Input name="q" placeholder="Search name or email…" defaultValue={query} className={query ? "pr-10" : undefined} />
+          <PendingForm action="/admin/users" role="search" className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+            <Input name="q" type="search" placeholder="Search name, email, phone, ARK username…" defaultValue={query} className={query ? "pr-10" : undefined} />
             {query && (
-              <Link
+              <PendingLink
                 href="/admin/users"
                 aria-label="Clear search"
                 className="absolute inset-y-0 right-0 grid w-10 place-items-center rounded-r-lg text-muted hover:text-foreground"
@@ -52,9 +56,9 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
                 <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                   <path d="M6 6l12 12M18 6L6 18" />
                 </svg>
-              </Link>
+              </PendingLink>
             )}
-          </form>
+          </PendingForm>
           <AddClientButton />
           </div>
         }
@@ -63,9 +67,9 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
         {users.length === 0 ? (
           <EmptyState title="No clients found.">
             {query && (
-              <Link href="/admin/users" className="font-medium text-brand hover:underline">
+              <PendingLink href="/admin/users" className="font-medium text-brand hover:underline">
                 Clear search
-              </Link>
+              </PendingLink>
             )}
           </EmptyState>
         ) : (
@@ -136,6 +140,6 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
           </div>
         )}
       </Card>
-    </>
+    </PendingArea>
   );
 }
