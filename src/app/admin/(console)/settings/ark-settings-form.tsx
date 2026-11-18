@@ -21,7 +21,7 @@ export type ArkFormValues = {
 
 /** A list from ARK, or why it couldn't be loaded (the field then takes a typed ID). */
 export type ChoiceList = { data: ArkChoice[]; error?: undefined } | { data?: undefined; error: string };
-export type ArkFormChoices = { offices: ChoiceList; genericPolicies: ChoiceList; scriptPolicies: ChoiceList } | { error: string } | null;
+export type ArkFormChoices = { genericPolicies: ChoiceList; scriptPolicies: ChoiceList } | { error: string } | null;
 
 export function ArkSettingsForm({ saved, choices }: { saved: ArkFormValues | null; choices: ArkFormChoices }) {
   const [state, action] = useActionState(async (prev: FormState, data: FormData) => {
@@ -59,9 +59,9 @@ export function ArkSettingsForm({ saved, choices }: { saved: ArkFormValues | nul
         name="parentId"
         label="Office"
         idLabel="Office ID"
-        hint="Where new clients are created."
+        hint="The ARK office new clients are created in."
         value={v.parentId}
-        list={choices && !("error" in choices) ? choices.offices : null}
+        list={null}
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <ChoiceField

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import type { ReactNode } from "react";
-import { Alert, Button, Card, CardHeader, EmptyState, Field, Input, PageHeader, Select, buttonClass, cn } from "@/components/ui";
+import { Button, Card, CardHeader, EmptyState, Field, Input, PageHeader, Select, buttonClass, cn } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { MANUAL_MONEY_TYPES } from "@/lib/ark/client";
 import { STUCK_MS } from "@/lib/ark-money";
@@ -10,18 +10,7 @@ import { db } from "@/lib/db";
 import { formatDate } from "@/lib/money";
 import { PendingArea, PendingForm, PendingLink } from "@/components/pending-nav";
 import { AddMoneyButton, RetryButton } from "./money-form";
-import {
-  TRANSACTION_TYPES,
-  amountOf,
-  bivoraAccounts,
-  getArkMoney,
-  isBivoraTransaction,
-  parentIdOf,
-  transactionIdOf,
-  transactionTypeOf,
-  userIdOf,
-  type ArkRow,
-} from "@/lib/ark/reports";
+import { TRANSACTION_TYPES } from "@/lib/ark/reports";
 
 export const metadata: Metadata = { title: "ARK money flow" };
 
@@ -30,14 +19,6 @@ const day = (d: Date) => d.toISOString().slice(0, 10);
 const param = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 const id = (v?: string) => (v && /^\d{1,12}$/.test(v) ? Number(v) : undefined);
 
-// Money out of the account; adjustments keep ARK's own sign.
-const OUT = new Set([2, 4]);
-function signed(row: ArkRow) {
-  const amount = amountOf(row);
-  const type = transactionTypeOf(row);
-  if (type === 5) return amount;
-  return OUT.has(type ?? 0) ? -Math.abs(amount) : Math.abs(amount);
-}
 const money = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/ark/money">) {
@@ -48,11 +29,6 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
   let from = DATE.test(param(q.from) ?? "") ? param(q.from)! : day(new Date(today.getTime() - 30 * 86_400_000));
   if (from > to) from = to;
   const type = id(param(q.type));
-  // Opens on Bivora's own transactions, read from Bivora's database; ARK is only asked when its list is chosen.
-  const source = param(q.source) === "all" || param(q.source) === "ark" ? param(q.source)! : "bivora";
-  const demo = param(q.demo) === "1";
-  const node = id(param(q.node));
-  const before = id(param(q.before));
   // From a client's page: that client is chosen in the New transaction form.
   const forClient = param(q.client);
 
@@ -64,25 +40,23 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
   const include = { user: { select: { id: true, firstName: true, lastName: true, currency: true } }, admin: { select: { email: true } } } as const;
 
   const header = (
-    <>
-      <PageHeader
-        title="ARK money flow"
-        description="Every money transaction on ARK, made in Bivora or in ARK directly."
-        action={
-          <AddMoneyButton
-            key={forClient ?? ""}
-            defaultClient={arkClients.some((c) => c.id === forClient) ? forClient : undefined}
-            firstKey={randomUUID().replace(/-/g, "")}
-            types={MANUAL_MONEY_TYPES}
-            clients={arkClients.map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`, detail: [c.arkUsername, c.email].filter(Boolean).join(" · ") }))}
-          />
-        }
-      />
-    </>
+    <PageHeader
+      title="ARK money flow"
+      description="Every money transaction made in Bivora: added here or approved from a request. From Bivora's records; ARK isn't asked."
+      action={
+        <AddMoneyButton
+          key={forClient ?? ""}
+          defaultClient={arkClients.some((c) => c.id === forClient) ? forClient : undefined}
+          firstKey={randomUUID().replace(/-/g, "")}
+          types={MANUAL_MONEY_TYPES}
+          clients={arkClients.map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`, detail: [c.arkUsername, c.email].filter(Boolean).join(" · ") }))}
+        />
+      }
+    />
   );
 
-  const keep = { from, to, ...(type && { type: String(type) }), ...(source !== "bivora" && { source }), ...(demo && { demo: "1" }), ...(node && { node: String(node) }) };
-  const filters = (top?: number) => (
+  const keep = { from, to, ...(type && { type: String(type) }) };
+  const filters = () => (
     <Card className="mb-6">
       <PendingForm action="/admin/ark/money" className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 sm:p-5 lg:grid-cols-6 lg:items-end">
         <Field label="From">
@@ -99,193 +73,73 @@ export default async function ArkMoneyPage({ searchParams }: PageProps<"/admin/a
             ))}
           </Select>
         </Field>
-        <Field label="Made in">
-          <Select name="source" defaultValue={source === "bivora" ? "" : source}>
-            <option value="">Bivora</option>
-            <option value="all">Bivora and ARK</option>
-            <option value="ark">ARK directly</option>
-          </Select>
-        </Field>
-        {source !== "bivora" && (
-          <Field label="Office or node ID">
-            <Input name="node" inputMode="numeric" placeholder={top ? `All (${top})` : "All"} defaultValue={node} />
-          </Field>
-        )}
-        <div className={cn("col-span-2 flex items-center justify-between gap-3 sm:col-span-3 lg:flex-col lg:items-stretch", source === "bivora" ? "lg:col-span-2" : "lg:col-span-1")}>
-          {source !== "bivora" ? (
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="demo" value="1" defaultChecked={demo} className="size-4 accent-[var(--brand)]" />
-              Include demo
-            </label>
-          ) : (
-            <span className="text-xs text-muted">Choose ARK in Made in to see ARK&apos;s own list.</span>
-          )}
-          <Button type="submit" variant="secondary">Apply</Button>
+        <div className="col-span-2 flex items-end sm:col-span-3 lg:col-span-1">
+          <Button type="submit" variant="secondary" className="w-full">Apply</Button>
         </div>
       </PendingForm>
     </Card>
   );
 
   // Bivora's own transactions: no ARK call at all.
-  if (source === "bivora") {
-    const PAGE = 100;
-    // Older pages go by date, since the list mixes two kinds of row.
-    const untilParam = param(q.until);
-    const until = untilParam && !Number.isNaN(Date.parse(untilParam)) ? new Date(untilParam) : null;
-    const range = { gte: new Date(`${from}T00:00:00`), lte: new Date(`${to}T23:59:59.999`), ...(until && { lt: until }) };
-    // Approved deposit and withdrawal requests are posted to ARK as type 1 or 2.
-    const requestType = type === 1 ? "DEPOSIT" : type === 2 ? "WITHDRAWAL" : undefined;
-    const [manual, approved] = await Promise.all([
-      db.arkMoneyTransaction.findMany({
-        where: { createdAt: range, ...(type && { type }) },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: PAGE + 1,
-        include,
-      }),
-      type && !requestType
-        ? Promise.resolve([])
-        : db.fundRequest.findMany({
-            where: { status: "APPROVED", reviewedAt: range, ...(requestType && { type: requestType }) },
-            orderBy: { reviewedAt: "desc" },
-            take: PAGE + 1,
-            include: { user: { select: { id: true, firstName: true, lastName: true, currency: true } }, reviewedBy: { select: { email: true } } },
-          }),
-    ]);
-    const merged = [
-      ...manual.map((r) => ({ ...r, request: false })),
-      ...approved.map((r) => ({
-        id: r.id,
-        type: r.type === "DEPOSIT" ? 1 : 2,
-        amount: r.amount,
-        comment: r.adminNote ?? r.userNote,
-        status: "DONE",
-        error: null,
-        arkTrxId: r.arkTrxId,
-        // Approval emails aren't tracked per request, so no email tag for these.
-        emailSentAt: r.reviewedAt,
-        attemptAt: null,
-        createdAt: r.reviewedAt ?? r.createdAt,
-        user: r.user,
-        admin: { email: r.reviewedBy?.email ?? "an admin" },
-        request: true,
-      })),
-    ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    const rows = merged.slice(0, PAGE);
-    const more = merged.length > PAGE ? rows[PAGE - 1].createdAt.toISOString() : null;
-    const waiting = rows.filter((r) => r.status !== "DONE").length;
-    return (
-      <PendingArea>
-        {header}
-        {filters()}
-        <Card>
-          <CardHeader
-            title="Made in Bivora"
-            description={`${from} to ${to}, newest first.${waiting ? ` ${waiting} not completed: Retry is safe, ARK never posts the same transaction twice.` : ""}`}
-            action={until ? <PendingLink href={`/admin/ark/money?${new URLSearchParams(keep)}`} className={buttonClass("ghost")}>Newest</PendingLink> : undefined}
-          />
-          <MadeList rows={rows} stuckBefore={today.getTime() - STUCK_MS} />
-          {more && (
-            <div className="border-t border-line p-4 text-center sm:p-5">
-              <PendingLink href={`/admin/ark/money?${new URLSearchParams({ ...keep, until: more })}`} className={buttonClass("secondary")}>Load older transactions</PendingLink>
-            </div>
-          )}
-        </Card>
-      </PendingArea>
-    );
-  }
-
-  const [result, accounts, made] = await Promise.all([
-    getArkMoney({ node, from, to, type: type && TRANSACTION_TYPES[type] ? type : undefined, demo, before }),
-    bivoraAccounts(),
-    // Only the ones that didn't reach ARK: everything else is in ARK's list below.
-    db.arkMoneyTransaction.findMany({ where: { status: { not: "DONE" } }, orderBy: { createdAt: "desc" }, take: 30, include }),
+  const PAGE = 100;
+  // Older pages go by date, since the list mixes two kinds of row.
+  const untilParam = param(q.until);
+  const until = untilParam && !Number.isNaN(Date.parse(untilParam)) ? new Date(untilParam) : null;
+  const range = { gte: new Date(`${from}T00:00:00`), lte: new Date(`${to}T23:59:59.999`), ...(until && { lt: until }) };
+  // Approved deposit and withdrawal requests are posted to ARK as type 1 or 2.
+  const requestType = type === 1 ? "DEPOSIT" : type === 2 ? "WITHDRAWAL" : undefined;
+  const [manual, approved] = await Promise.all([
+    db.arkMoneyTransaction.findMany({
+      where: { createdAt: range, ...(type && { type }) },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: PAGE + 1,
+      include,
+    }),
+    type && !requestType
+      ? Promise.resolve([])
+      : db.fundRequest.findMany({
+          where: { status: "APPROVED", reviewedAt: range, ...(requestType && { type: requestType }) },
+          orderBy: { reviewedAt: "desc" },
+          take: PAGE + 1,
+          include: { user: { select: { id: true, firstName: true, lastName: true, currency: true } }, reviewedBy: { select: { email: true } } },
+        }),
   ]);
-  const notPosted = made.length > 0 && (
-    <Card className="mb-6 min-w-0 border-warning/40">
-      <CardHeader title="Not completed in ARK" description="ARK didn't confirm these. Retry is safe: ARK never posts the same transaction twice." />
-      <MadeList rows={made} stuckBefore={today.getTime() - STUCK_MS} />
-    </Card>
-  );
-  if ("error" in result) {
-    return (
-      <>
-        {header}
-        {notPosted}
-        {filters()}
-        <Alert tone="error">{result.error}</Alert>
-        <p className="mt-3 text-sm">
-          <Link href="/admin/settings" className="font-medium text-brand hover:underline">Check ARK settings</Link>
-        </p>
-      </>
-    );
-  }
-
-  const references = new Set(result.bivoraReferences);
-  const tagged = result.rows.map((row) => ({ row, bivora: isBivoraTransaction(row, references) }));
-  const shown = tagged.filter((t) => source === "all" || !t.bivora);
-
-  const olderHref = result.older ? `/admin/ark/money?${new URLSearchParams({ ...keep, before: String(result.older) })}` : null;
-
+  const merged = [
+    ...manual.map((r) => ({ ...r, request: false })),
+    ...approved.map((r) => ({
+      id: r.id,
+      type: r.type === "DEPOSIT" ? 1 : 2,
+      amount: r.amount,
+      comment: r.adminNote ?? r.userNote,
+      status: "DONE",
+      error: null,
+      arkTrxId: r.arkTrxId,
+      // Approval emails aren't tracked per request, so no email tag for these.
+      emailSentAt: r.reviewedAt,
+      attemptAt: null,
+      createdAt: r.reviewedAt ?? r.createdAt,
+      user: r.user,
+      admin: { email: r.reviewedBy?.email ?? "an admin" },
+      request: true,
+    })),
+  ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const rows = merged.slice(0, PAGE);
+  const more = merged.length > PAGE ? rows[PAGE - 1].createdAt.toISOString() : null;
+  const waiting = rows.filter((r) => r.status !== "DONE").length;
   return (
     <PendingArea>
       {header}
-      {notPosted}
-      {filters(result.top)}
-
+      {filters()}
       <Card>
         <CardHeader
-          title="Transactions"
-          description={`${from} to ${to}, newest first${before ? ", older page" : ""}.`}
-          action={before ? <PendingLink href={`/admin/ark/money?${new URLSearchParams(keep)}`} className={buttonClass("ghost")}>Newest</PendingLink> : undefined}
+          title="Made in Bivora"
+          description={`${from} to ${to}, newest first.${waiting ? ` ${waiting} not completed: Retry is safe, ARK never posts the same transaction twice.` : ""}`}
+          action={until ? <PendingLink href={`/admin/ark/money?${new URLSearchParams(keep)}`} className={buttonClass("ghost")}>Newest</PendingLink> : undefined}
         />
-        {shown.length === 0 ? (
-          <EmptyState title="No money transactions for these filters." />
-        ) : (
-          <ul className="divide-y divide-line">
-            {shown.map(({ row, bivora }, i) => {
-              const userId = userIdOf({ userId: row.userId, userID: row.userID });
-              const client = userId !== undefined ? accounts.get(userId) : undefined;
-              const typeId = transactionTypeOf(row);
-              const amount = signed(row);
-              const comment = typeof row.comment === "string" ? row.comment : typeof row.trxComment === "string" ? row.trxComment : "";
-              const time = typeof row.transactionTime === "string" ? row.transactionTime : typeof row.trxDate === "string" ? row.trxDate : "";
-              return (
-                <li key={transactionIdOf(row) ?? i} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 py-3 text-sm sm:px-5">
-                  <div className="min-w-0 flex-1 basis-60 [overflow-wrap:anywhere]">
-                    <p className="flex flex-wrap items-center gap-1.5">
-                      <span className="font-medium">{TRANSACTION_TYPES[typeId ?? 0] ?? `Type ${typeId ?? "?"}`}</span>
-                      <Tag tone={bivora ? "brand" : undefined}>{bivora ? "Bivora" : "ARK"}</Tag>
-                    </p>
-                    <p className="mt-0.5">
-                      {client ? (
-                        <Link href={`/admin/users/${client.id}`} className="hover:text-brand">{client.name}</Link>
-                      ) : (
-                        `ARK user ${userId ?? "?"}`
-                      )}
-                      <span className="text-xs text-muted">
-                        {" "}· User {userId ?? "—"} · Office {parentIdOf(row) ?? "—"}
-                      </span>
-                    </p>
-                    {comment && <p className="text-xs text-muted">{comment}</p>}
-                    {typeof row.requestReference === "string" && row.requestReference && (
-                      <p className="font-mono text-xs text-muted">Ref {row.requestReference}</p>
-                    )}
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className={cn("font-mono font-medium tabular-nums", amount < 0 ? "text-down" : "text-up")}>
-                      {amount < 0 ? "−" : "+"}{money(Math.abs(amount))}
-                    </p>
-                    <p className="text-xs text-muted">{time.slice(0, 16)}</p>
-                    <p className="font-mono text-xs text-muted">#{transactionIdOf(row) ?? "—"}</p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        {olderHref && (
+        <MadeList rows={rows} stuckBefore={today.getTime() - STUCK_MS} />
+        {more && (
           <div className="border-t border-line p-4 text-center sm:p-5">
-            <PendingLink href={olderHref} className={buttonClass("secondary")}>Load older transactions</PendingLink>
+            <PendingLink href={`/admin/ark/money?${new URLSearchParams({ ...keep, until: more })}`} className={buttonClass("secondary")}>Load older transactions</PendingLink>
           </div>
         )}
       </Card>

@@ -25,16 +25,13 @@ export default async function HealthPage() {
 
   const dbLevel: Level = db.roundTripError ? "bad" : rate(db.median, 60, 250);
   const freshLevel: Level = db.fresh.error ? "bad" : rate(db.fresh.ms, 800, 3000);
-  const ping = h.ark.ping;
-  const arkLevel: Level | null = !ping ? null : "error" in ping || !ping.ok ? "bad" : rate(ping.ms, 1000, 2500);
   const cold = h.server.upSeconds < 60 && h.server.checksOnThisServer === 1;
 
   // Plain-language findings, worst first.
   const findings: { level: Level; text: string }[] = [];
   if (dbLevel !== "good") findings.push({ level: dbLevel, text: `Each database query takes about ${ms(db.median)}. A page runs several, so this alone adds seconds. Usually it means the database is far from the app server (${h.server.region}).` });
   if (freshLevel !== "good") findings.push({ level: freshLevel, text: `Opening a new database connection takes ${ms(db.fresh.ms)}. Every fresh server pays this before its first page, which is the slow first sign-in.` });
-  if (arkLevel && arkLevel !== "good") findings.push({ level: arkLevel, text: ping && "error" in ping ? `ARK didn't answer: ${ping.error}` : `An ARK request takes ${ms(ping && "ms" in ping ? ping.ms : 0)}. ARK pages wait for ARK.` });
-  if (h.ark.session && !h.ark.session.live) findings.push({ level: "slow", text: "There was no live ARK session, so this check had to sign in to ARK. The heartbeat should keep one open." });
+  if (h.ark.session && !h.ark.session.live) findings.push({ level: "slow", text: "There's no live ARK session, so the next ARK action has to sign in first. The heartbeat should keep one open." });
   if (cold) findings.push({ level: "slow", text: "This check ran on a server that had just started (a cold start), so its first numbers include start-up time. Run it again for warm numbers." });
   const worst: Level = findings.some((f) => f.level === "bad") ? "bad" : findings.length ? "slow" : "good";
 
@@ -79,19 +76,13 @@ export default async function HealthPage() {
         </Card>
 
         <Card>
-          <CardHeader title="ARK" description="The shared dealer session and how fast ARK answers." />
+          <CardHeader title="ARK" description="The shared dealer session. ARK isn't called by this check." />
           {!h.ark.configured ? (
             <p className="p-5 text-sm text-muted">ARK isn&apos;t set up yet.</p>
           ) : (
             <Rows>
               <Row
-                label="One ARK request"
-                value={ping && "ms" in ping ? ms(ping.ms) : "—"}
-                level={arkLevel ?? "bad"}
-                hint={ping && "error" in ping ? ping.error : ping && !ping.ok ? `ARK answered ${ping.status} ${ping.message ?? ""}` : "Includes signing in if there was no session."}
-              />
-              <Row
-                label="Session before this check"
+                label="Session"
                 value={h.ark.session?.live ? "Open" : h.ark.session?.hasSession ? "Expired" : "None"}
                 level={h.ark.session?.live ? "good" : "slow"}
                 hint={`Last used ${ago(h.ark.session?.usedAt)}. The heartbeat keeps it open every 10 minutes.`}

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Alert, ButtonLink, Card, CardHeader, EmptyState, cn } from "@/components/ui";
+import { ButtonLink, Card, CardHeader, EmptyState, cn } from "@/components/ui";
 import { MANUAL_MONEY_TYPES } from "@/lib/ark/client";
-import { TRANSACTION_TYPES, amountOf, arkTimeOf, getClientArkMoney, isBivoraTransaction, transactionIdOf, transactionTypeOf } from "@/lib/ark/reports";
+import { TRANSACTION_TYPES } from "@/lib/ark/reports";
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/money";
 
@@ -18,97 +18,48 @@ const STATUS: Record<string, { label: string; tone: Row["tone"] }> = {
   PENDING: { label: "Sending…", tone: "warn" },
 };
 
-/**
- * Money on this client's trading account. "Made in Bivora" is Bivora's own records (no ARK call);
- * "ARK history" asks ARK for its full list, only when that tab is opened.
- */
-export async function ArkMoneySection({ userId, arkUserId, tab }: { userId: string; arkUserId: string; tab: "bivora" | "ark" }) {
-  const tabs = (
-    <div className="flex gap-1 border-b border-line px-4 py-2 text-sm sm:px-5">
-      {([["bivora", "Made in Bivora"], ["ark", "ARK history"]] as const).map(([value, label]) => (
-        <Link
-          key={value}
-          href={`/admin/users/${userId}${value === "ark" ? "?money=ark" : ""}#money`}
-          scroll={false}
-          className={cn("rounded-lg px-2.5 py-1", tab === value ? "bg-surface-2 font-medium" : "text-muted hover:text-foreground")}
-        >
-          {label}
-        </Link>
-      ))}
-    </div>
-  );
-
-  let rows: Row[] = [];
-  let error: string | null = null;
-  let unsent = 0;
-  if (tab === "bivora") {
-    const [manual, approved] = await Promise.all([
-      db.arkMoneyTransaction.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 100 }),
-      db.fundRequest.findMany({ where: { userId, status: "APPROVED" }, orderBy: { reviewedAt: "desc" }, take: 100 }),
-    ]);
-    unsent = manual.filter((m) => m.status !== "DONE").length;
-    rows = [
-      ...manual.map((m) => {
-        const status = STATUS[m.status] ?? { label: m.status, tone: "muted" as const };
-        return { key: m.id, type: m.type, amount: Number(m.amount), tag: status.label, tone: status.tone, note: m.comment, when: formatDate(m.createdAt), ref: m.arkTrxId, at: m.createdAt.getTime() };
-      }),
-      ...approved.map((r) => ({
-        key: r.id,
-        type: r.type === "DEPOSIT" ? 1 : 2,
-        amount: Number(r.amount),
-        tag: "Approved request",
-        tone: "brand" as const,
-        note: r.adminNote ?? r.userNote,
-        when: formatDate(r.reviewedAt ?? r.createdAt),
-        ref: r.arkTrxId,
-        at: (r.reviewedAt ?? r.createdAt).getTime(),
-      })),
-    ]
-      .sort((a, b) => b.at - a.at)
-      .slice(0, 100);
-  } else {
-    const result = await getClientArkMoney(arkUserId);
-    if ("error" in result) error = result.error;
-    else {
-      const refs = new Set(result.references);
-      rows = result.rows.map((r, i) => {
-        const bivora = isBivoraTransaction(r, refs);
-        const comment = typeof r.comment === "string" ? r.comment : typeof r.trxComment === "string" ? r.trxComment : null;
-        return {
-          key: String(transactionIdOf(r) ?? i),
-          type: transactionTypeOf(r) ?? 0,
-          amount: amountOf(r),
-          tag: bivora ? "Bivora" : "ARK",
-          tone: bivora ? ("brand" as const) : ("muted" as const),
-          note: comment,
-          when: arkTimeOf(r).slice(0, 16),
-          ref: transactionIdOf(r) != null ? String(transactionIdOf(r)) : null,
-        };
-      });
-    }
-  }
+/** Money on this client's trading account, from Bivora's own records: no ARK call. */
+export async function ArkMoneySection({ userId }: { userId: string }) {
+  const [manual, approved] = await Promise.all([
+    db.arkMoneyTransaction.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 100 }),
+    db.fundRequest.findMany({ where: { userId, status: "APPROVED" }, orderBy: { reviewedAt: "desc" }, take: 100 }),
+  ]);
+  const unsent = manual.filter((m) => m.status !== "DONE").length;
+  const rows: Row[] = [
+    ...manual.map((m) => {
+      const status = STATUS[m.status] ?? { label: m.status, tone: "muted" as const };
+      return { key: m.id, type: m.type, amount: Number(m.amount), tag: status.label, tone: status.tone, note: m.comment, when: formatDate(m.createdAt), ref: m.arkTrxId, at: m.createdAt.getTime() };
+    }),
+    ...approved.map((r) => ({
+      key: r.id,
+      type: r.type === "DEPOSIT" ? 1 : 2,
+      amount: Number(r.amount),
+      tag: "Approved request",
+      tone: "brand" as const,
+      note: r.adminNote ?? r.userNote,
+      when: formatDate(r.reviewedAt ?? r.createdAt),
+      ref: r.arkTrxId,
+      at: (r.reviewedAt ?? r.createdAt).getTime(),
+    })),
+  ]
+    .sort((a, b) => b.at - a.at)
+    .slice(0, 100);
 
   return (
     <Card id="money" className="mt-6 min-w-0 scroll-mt-20">
       <CardHeader
         title="Trading account money"
-        description={tab === "bivora" ? "Money transactions made in Bivora and approved requests, from Bivora's records." : "Every money transaction ARK has on this account, newest first."}
+        description="Money transactions made in Bivora and approved requests, from Bivora's records."
         action={<ButtonLink href={`/admin/ark/money?client=${encodeURIComponent(userId)}#new`} variant="secondary">Add money transaction</ButtonLink>}
       />
-      {tabs}
-      {error && (
-        <div className="px-4 pt-4 sm:px-5">
-          <Alert tone="error">Couldn&apos;t get ARK&apos;s list: {error}</Alert>
-        </div>
-      )}
       {unsent > 0 && (
         <p className="border-b border-line px-4 py-3 text-xs text-warning sm:px-5">
           {unsent} transaction{unsent === 1 ? "" : "s"} didn&apos;t reach ARK.{" "}
           <Link href="/admin/ark/money" className="font-medium underline">Retry on Money flow</Link>
         </p>
       )}
-      {rows.length === 0 && !error ? (
-        <EmptyState title={tab === "bivora" ? "No money transactions made in Bivora yet." : "ARK has no money transactions on this account."} />
+      {rows.length === 0 ? (
+        <EmptyState title="No money transactions made in Bivora yet." />
       ) : (
         <ul className="divide-y divide-line">
           {rows.map((r) => {

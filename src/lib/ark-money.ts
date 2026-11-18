@@ -68,7 +68,7 @@ async function send(id: string): Promise<MoneyResult> {
       await db.arkMoneyTransaction.update({ where: { id }, data: { status: unknown ? "CHECK" : "FAILED", error: e.message } });
       return {
         error: unknown
-          ? "ARK didn't answer, so it isn't known whether this went through. Check the ARK list below, then use Retry: it can never post twice."
+          ? "ARK didn't answer, so it isn't known whether this went through. Use Retry: it can never post twice."
           : e.message,
       };
     }
@@ -83,7 +83,7 @@ async function send(id: string): Promise<MoneyResult> {
     return { error: "ARK didn't confirm this transaction. It's marked Not confirmed by ARK: use Retry to confirm it, it can never post twice." };
   }
   await db.arkMoneyTransaction.update({ where: { id }, data: { status: "DONE", error: null, ...(arkTrxId && { arkTrxId }) } });
-  // Shown on the client's page at once; ARK's report brings the same row later and is skipped.
+  // Shown on the client's page at once.
   if (arkTrxId) {
     await db.arkTransaction.createMany({
       data: [{ id: arkTrxId, userId: row.userId, arkUserId: row.arkUserId, type, amount, comment: row.comment, reference: row.id, madeInBivora: true, time: localTime(new Date()) }],

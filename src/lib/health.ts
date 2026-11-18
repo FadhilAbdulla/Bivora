@@ -1,6 +1,6 @@
 import "server-only";
 import { PrismaClient } from "@prisma/client";
-import { ArkError, arkPing, arkSessionStatus } from "./ark/client";
+import { arkSessionStatus } from "./ark/client";
 import { db } from "./db";
 import { missingEmailSettings } from "./email";
 import { hasEncryptionKey } from "./secrets";
@@ -46,7 +46,7 @@ async function freshConnection(): Promise<Timed> {
 export async function runHealthCheck() {
   checksOnThisServer++;
   const server = {
-    region: process.env.VERCEL_REGION ?? "local",
+    region: process.env.VERCEL_REGION ?? process.env.RAILWAY_REPLICA_REGION ?? "local",
     upSeconds: Math.round((Date.now() - processStarted) / 1000),
     checksOnThisServer,
     node: process.version,
@@ -68,15 +68,8 @@ export async function runHealthCheck() {
     connections = { error: e instanceof Error ? e.message.slice(0, 200) : "Couldn't read." };
   }
 
+  // ARK isn't called here: only the saved session is read.
   const session = await arkSessionStatus().catch(() => null);
-  let ark: { ms: number; ok: boolean; status: number; message?: string } | { error: string } | null = null;
-  if (session) {
-    try {
-      ark = await arkPing();
-    } catch (e) {
-      ark = { error: e instanceof ArkError ? e.message : "ARK check failed." };
-    }
-  }
 
   const ms = rounds.map((r) => r.ms);
   return {
@@ -91,7 +84,7 @@ export async function runHealthCheck() {
       fresh,
       connections,
     },
-    ark: { configured: Boolean(session), session, ping: ark },
+    ark: { configured: Boolean(session), session },
     config: {
       email: missingEmailSettings(),
       storage: ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"].filter((k) => !process.env[k]),

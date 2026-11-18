@@ -19,10 +19,9 @@ import { bankCodeName } from "@/lib/bank";
 
 export const metadata: Metadata = { title: "Client" };
 
-export default async function UserDetailPage({ params, searchParams }: PageProps<"/admin/users/[id]">) {
+export default async function UserDetailPage({ params }: PageProps<"/admin/users/[id]">) {
   const admin = await requireAdmin();
   const { id } = await params;
-  const moneyTab = (await searchParams).money === "ark" ? "ark" : "bivora";
   const user = await db.user.findUnique({ where: { id, role: "USER" } });
   if (!user) notFound();
 
@@ -154,7 +153,7 @@ export default async function UserDetailPage({ params, searchParams }: PageProps
 
       {user.arkUserId && (
         <Suspense fallback={<ArkMoneySectionLoading />}>
-          <ArkMoneySection userId={user.id} arkUserId={user.arkUserId} tab={moneyTab} />
+          <ArkMoneySection userId={user.id} />
         </Suspense>
       )}
 

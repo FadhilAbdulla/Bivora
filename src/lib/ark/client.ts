@@ -250,14 +250,6 @@ export async function arkSessionStatus() {
   };
 }
 
-/** One small ARK request on the shared session, timed (signs in first if there is no session). */
-export async function arkPing() {
-  const config = await loadArkConfig();
-  const started = Date.now();
-  const result = await arkRequest<unknown>(config, `/admin/public/api/v2/username/${encodeURIComponent(config.dealerUsername)}`, { method: "GET" });
-  return { ms: Date.now() - started, ok: result.ok, status: result.status, message: result.message };
-}
-
 /** After ARK refuses the dealer login, the heartbeat waits this long before trying again. */
 const LOGIN_RETRY_MS = 60 * 60_000;
 
